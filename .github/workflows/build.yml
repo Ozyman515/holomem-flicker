@@ -1,0 +1,51 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleRelease 2>&1 | tee build.log
+          cp app/build/outputs/apk/release/app-release.apk holomem-flicker-v${{ github.run_number }}.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Holomem Flicker v${{ github.run_number }}
+          body: "Install the APK below on the tablet. Commit: ${{ github.sha }}"
+          files: holomem-flicker-v${{ github.run_number }}.apk
+
+      - name: Save build log to ci-log branch
+        if: always()
+        run: |
+          cp build.log /tmp/build.log 2>/dev/null || echo "no log" > /tmp/build.log
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git switch --orphan ci-log-tmp
+          cp /tmp/build.log build.log
+          echo "run ${{ github.run_number }} result: ${{ job.status }}" > status.txt
+          git add build.log status.txt
+          git commit -q -m "build log run ${{ github.run_number }}"
+          git push -f origin HEAD:ci-log
