@@ -72,6 +72,15 @@ object DeviceScanner {
         return out
     }
 
+    /** Every node that looks like a gamepad (sticks or shoulder buttons), not a touchscreen. */
+    fun candidates(devs: List<DeviceInfo>, forcedPath: String): List<DeviceInfo> {
+        if (forcedPath.isNotEmpty()) return devs.filter { it.path == forcedPath }
+        return devs.filter {
+            !it.abs.containsKey(0x35) &&
+                ((it.abs.containsKey(0) && it.abs.containsKey(1)) || it.keys.contains(0x136) || it.keys.contains(0x130))
+        }
+    }
+
     /** Pick the game controller: prefer Razer/Kishi, else anything with L1 + a left stick. */
     fun pickController(devs: List<DeviceInfo>, forcedPath: String): DeviceInfo? {
         if (forcedPath.isNotEmpty()) devs.firstOrNull { it.path == forcedPath }?.let { return it }

@@ -53,12 +53,61 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private val sticks = ArrayList<Stick>()
     private val stickCfg = ArrayList<JSONObject>()
 
-    private val raw = HashMap<Int, Int>()
-    private val range = HashMap<Int, IntArray>()
     private val recent = ArrayDeque<String>()
 
+    /** One input node being read. Several are read at once, because system mappers
+     *  (Lenovo's included) may hide the real controller behind a virtual one. */
+    private inner class Reader(val dev: DeviceInfo) : Thread("reader-" + dev.path) {
+        val raw = HashMap<Int, Int>()
+        val range = HashMap<Int, IntArray>()
+        @Volatile var events = 0
+        var stream: FileInputStream? = null
+
+        init {
+            for ((code, arr) in dev.abs) {
+                range[code] = intArrayOf(arr[1], arr[2])
+                raw[code] = arr[0]
+            }
+        }
+
+        fun norm(code: Int): Float {
+            val r = range[code] ?: return 0f
+            val v = raw[code] ?: return 0f
+            val span = (r[1] - r[0]).toFloat()
+            if (span <= 0f) return 0f
+            return ((v - r[0]) / span) * 2f - 1f
+        }
+
+        override fun run() {
+            val buf = ByteArray(24 * 64)
+            val bb = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN)
+            try {
+                FileInputStream(dev.path).use { s ->
+                    stream = s
+                    while (running) {
+                        val n = s.read(buf)
+                        if (n <= 0) break
+                        var off = 0
+                        while (off + 24 <= n) {
+                            val type = bb.getShort(off + 16).toInt() and 0xffff
+                            val code = bb.getShort(off + 18).toInt() and 0xffff
+                            val value = bb.getInt(off + 20)
+                            events++
+                            handle(this, type, code, value)
+                            off += 24
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                if (running) note("${dev.path} stopped: $t")
+            }
+        }
+    }
+
+    private val readers = ArrayList<Reader>()
+    @Volatile private var active: Reader? = null
+
     private var inj: TouchInjector? = null
-    private var stream: FileInputStream? = null
 
     init {
         val ta = cfg.optJSONArray("taps")
@@ -79,25 +128,21 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     fun shutdown() {
         running = false
-        try { stream?.close() } catch (_: Throwable) {}
+        for (r in readers) try { r.stream?.close() } catch (_: Throwable) {}
         try { inj?.releaseAll() } catch (_: Throwable) {}
-    }
-
-    private fun norm(code: Int): Float {
-        val r = range[code] ?: return 0f
-        val v = raw[code] ?: return 0f
-        val span = (r[1] - r[0]).toFloat()
-        if (span <= 0f) return 0f
-        return ((v - r[0]) / span) * 2f - 1f
     }
 
     fun monitorText(): String {
         val sb = StringBuilder(status).append('\n')
+        val a = active
         for (s in sticks) {
-            sb.append("%s  x=%+.2f y=%+.2f %s\n".format(s.name, norm(s.ax), norm(s.ay), if (s.pid >= 0) "FLICK" else ""))
+            val x = a?.norm(s.ax) ?: 0f
+            val y = a?.norm(s.ay) ?: 0f
+            sb.append("%s  x=%+.2f y=%+.2f %s\n".format(s.name, x, y, if (s.pid >= 0) "FLICK" else ""))
         }
         val i = inj
         sb.append("controller events read: $nEvents (buttons: $nKeys)\n")
+        for (r in readers) sb.append("  ${r.dev.path} \"${r.dev.name}\": ${r.events} events\n")
         sb.append("fingers down: ").append(i?.count() ?: 0)
             .append("   touches sent: ").append(i?.sent ?: 0)
             .append("   failed: ").append(i?.failed ?: 0).append('\n')
@@ -121,20 +166,17 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         val injector = TouchInjector()
         inj = injector
         val devs = DeviceScanner.scan()
-        val dev = DeviceScanner.pickController(devs, forcedPath)
-        if (dev == null) {
+        val cands = DeviceScanner.candidates(devs, forcedPath)
+        if (cands.isEmpty()) {
             status = "ERROR: no controller found. Devices:\n" + devs.joinToString("\n")
             return
         }
-        for ((code, arr) in dev.abs) {
-            range[code] = intArrayOf(arr[1], arr[2])
-            raw[code] = arr[0]
-        }
+        val main = DeviceScanner.pickController(cands, forcedPath) ?: cands[0]
         val right = when (rightAxes) {
             "z" -> 2 to 5
             "rx" -> 3 to 4
-            else -> if (dev.abs.containsKey(9) || dev.abs.containsKey(10)) 2 to 5
-            else if (dev.abs.containsKey(3) && dev.abs.containsKey(4)) 3 to 4
+            else -> if (main.abs.containsKey(9) || main.abs.containsKey(10)) 2 to 5
+            else if (main.abs.containsKey(3) && main.abs.containsKey(4)) 3 to 4
             else 2 to 5
         }
         for (o in stickCfg) {
@@ -142,28 +184,17 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             val (ax, ay) = if (isRight) right else (0 to 1)
             sticks.add(Stick(o.optString("name"), ax, ay, o.optDouble("x").toFloat(), o.optDouble("y").toFloat()))
         }
-        status = "Running on ${dev.name} (${dev.path}), right stick axes %02x/%02x".format(right.first, right.second)
-
-        val buf = ByteArray(24 * 64)
-        val bb = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN)
-        FileInputStream(dev.path).use { s ->
-            stream = s
-            while (running) {
-                val n = s.read(buf)
-                if (n <= 0) break
-                var off = 0
-                while (off + 24 <= n) {
-                    val type = bb.getShort(off + 16).toInt() and 0xffff
-                    val code = bb.getShort(off + 18).toInt() and 0xffff
-                    val value = bb.getInt(off + 20)
-                    handle(injector, type, code, value)
-                    off += 24
-                }
-            }
-        }
+        for (d in cands) readers.add(Reader(d))
+        active = readers.firstOrNull { it.dev === main }
+        status = "Running: listening to ${readers.size} input device(s), main = ${main.name}, right stick axes %02x/%02x"
+            .format(right.first, right.second)
+        for (r in readers) r.start()
+        for (r in readers) r.join()
     }
 
-    private fun handle(injector: TouchInjector, type: Int, code: Int, value: Int) {
+    @Synchronized
+    private fun handle(r: Reader, type: Int, code: Int, value: Int) {
+        val injector = inj ?: return
         nEvents++
         if (type == 1) nKeys++
         when (type) {
@@ -173,7 +204,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     keySeq++
                     lastKey = "$keySeq:$code"
                 }
-                note("button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
+                note("${r.dev.path} button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
                 for (t in taps) {
                     if (t.code != code) continue
                     if (value == 1 && t.pid < 0) {
@@ -184,14 +215,17 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     }
                 }
             }
-            3 -> raw[code] = value // EV_ABS
-            0 -> if (code == 0) for (s in sticks) stick(injector, s) // SYN_REPORT
+            3 -> { // EV_ABS
+                r.raw[code] = value
+                active = r
+            }
+            0 -> if (code == 0 && active === r) for (s in sticks) stick(injector, r, s) // SYN_REPORT
         }
     }
 
-    private fun stick(injector: TouchInjector, s: Stick) {
-        val x = norm(s.ax)
-        val y = norm(s.ay)
+    private fun stick(injector: TouchInjector, r: Reader, s: Stick) {
+        val x = r.norm(s.ax)
+        val y = r.norm(s.ay)
         if (x == s.lastX && y == s.lastY) return
         s.lastX = x
         s.lastY = y
