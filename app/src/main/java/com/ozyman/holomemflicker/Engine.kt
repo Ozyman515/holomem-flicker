@@ -24,8 +24,22 @@ import kotlin.math.min
  */
 class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
-    private class Tap(val code: Int, val x: Float, val y: Float) {
+    /** A tap point; each press lands at a random spot inside radius [r]. */
+    private class Tap(val code: Int, val x: Float, val y: Float, val r: Float) {
         var pid = -1
+    }
+
+    private val rng = java.util.Random()
+
+    /** Uniform random point in the tap circle. */
+    private fun spot(t: Tap): FloatArray {
+        if (t.r <= 1f) return floatArrayOf(t.x, t.y)
+        val a = rng.nextDouble() * Math.PI * 2
+        val d = t.r * Math.sqrt(rng.nextDouble())
+        return floatArrayOf(
+            (t.x + d * Math.cos(a)).toFloat().coerceIn(1f, screenW - 1f),
+            (t.y + d * Math.sin(a)).toFloat().coerceIn(1f, screenH - 1f)
+        )
     }
 
     private class Stick(
@@ -39,6 +53,10 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         var py = 0f
         var lastX = 0f
         var lastY = 0f
+        // bounce guard: direction of the last flick and when it ended
+        var dirX = 0f
+        var dirY = 0f
+        var upAt = 0L
     }
 
     private class Mode(val name: String, val taps: List<Tap>, val stickCfg: List<JSONObject>) {
@@ -61,6 +79,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private val modKey = cfg.optInt("modKey", 0x13a)
     private val overlayKey = cfg.optInt("overlayKey", 0x136)
     private val modeKey = cfg.optInt("modeKey", 0x137)
+    private val editKey = cfg.optInt("editKey", 0x13b)
 
     private val modes = ArrayList<Mode>()
     @Volatile var modeIdx = 0
@@ -68,6 +87,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     @Volatile var overlayOn = false
         private set
     @Volatile var modeSeq = 0
+        private set
+    @Volatile var editing = false
         private set
 
     private var modHeld = false
@@ -150,7 +171,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         val ta = o.optJSONArray("taps")
         if (ta != null) for (i in 0 until ta.length()) {
             val t = ta.getJSONObject(i)
-            taps.add(Tap(t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat()))
+            taps.add(Tap(t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat(), t.optDouble("r", 0.0).toFloat()))
         }
         val sc = ArrayList<JSONObject>()
         val sa = o.optJSONArray("sticks")
@@ -184,6 +205,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("modeName", if (modes.isEmpty()) "" else mode.name)
         o.put("overlay", overlayOn)
         o.put("modeSeq", modeSeq)
+        o.put("editing", editing)
+        o.put("lastKey", lastKey)
         o.put("running", status.startsWith("Running"))
         return o.toString()
     }
@@ -207,6 +230,13 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     @Synchronized
     fun setOverlay(on: Boolean) {
         overlayOn = on
+    }
+
+    /** In-game editor open: nothing reaches the game. */
+    @Synchronized
+    fun setEditing(on: Boolean) {
+        if (on) releaseMode()
+        editing = on
     }
 
     private fun releaseMode() {
@@ -292,6 +322,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     @Synchronized
     private fun handle(r: Reader, type: Int, code: Int, value: Int) {
+        if (!running) return
         val injector = inj ?: return
         nEvents++
         if (type == 1) nKeys++
@@ -301,7 +332,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                 r.raw[code] = value
                 active = r
             }
-            0 -> if (code == 0 && active === r) for (s in mode.sticks) stick(injector, r, s) // SYN_REPORT
+            0 -> if (code == 0 && active === r && !editing) for (s in mode.sticks) stick(injector, r, s) // SYN_REPORT
         }
     }
 
@@ -321,7 +352,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                 comboUsed = false
             } else {
                 modHeld = false
-                if (!comboUsed) quickTap(injector, code) // Select alone = its own tap
+                if (!comboUsed && !editing) quickTap(injector, code) // Select alone = its own tap
             }
             return
         }
@@ -334,16 +365,22 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     note("overlay ${if (overlayOn) "on" else "off"}")
                 }
                 modeKey -> setMode((modeIdx + 1) % modes.size)
+                editKey -> {
+                    setEditing(!editing)
+                    note("editor ${if (editing) "open" else "closed"}")
+                }
             }
             return
         }
         if (value == 0 && suppressed.remove(code)) return
+        if (editing) return
 
         // ---- normal taps ----
         for (t in mode.taps) {
             if (t.code != code) continue
             if (value == 1 && t.pid < 0) {
-                t.pid = injector.down(t.x, t.y)
+                val p = spot(t)
+                t.pid = injector.down(p[0], p[1])
             } else if (value == 0 && t.pid >= 0) {
                 injector.up(t.pid)
                 t.pid = -1
@@ -353,7 +390,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     /** Short tap at every point mapped to [code] in the current mode. */
     private fun quickTap(injector: TouchInjector, code: Int) {
-        val ids = mode.taps.filter { it.code == code }.map { injector.down(it.x, it.y) }
+        val ids = mode.taps.filter { it.code == code }.map { val p = spot(it); injector.down(p[0], p[1]) }
         if (ids.isEmpty()) return
         timer.schedule(Runnable {
             synchronized(this@Engine) { for (id in ids) injector.up(id) }
@@ -378,6 +415,11 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         if (s.pid < 0) {
             if (mag >= s.dead) {
                 val ux = x / mag
+                if (s.type == "flick" && System.currentTimeMillis() - s.upAt < 180) {
+                    // stick springing back past centre after a hard flick: ignore the opposite direction
+                    val dot = ux * s.dirX + (y / mag) * s.dirY
+                    if (dot < -0.3f) return
+                }
                 s.sx = (s.bx + ux * s.reach).coerceIn(1f, screenW - 1f)
                 s.sy = s.by.coerceIn(1f, screenH - 1f)
                 s.pid = injector.down(s.sx, s.sy)
@@ -386,7 +428,10 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         } else if (mag < s.dead * 0.6f) {
             injector.up(s.pid)
             s.pid = -1
+            s.upAt = System.currentTimeMillis()
         } else {
+            s.dirX = x / mag
+            s.dirY = y / mag
             val m = min(mag, 1f) * s.radius / mag
             val tx = (s.sx + x * m).coerceIn(1f, screenW - 1f)
             val ty = (s.sy + y * m).coerceIn(1f, screenH - 1f)
@@ -400,7 +445,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             synchronized(this) {
                 val injector = inj ?: return
                 val a = active ?: return
-                if (modes.isEmpty()) return
+                if (modes.isEmpty() || editing || !running) return
                 for (s in mode.sticks) {
                     if (s.type != "camera") continue
                     val x = a.norm(s.ax)

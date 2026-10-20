@@ -12,7 +12,10 @@ import kotlin.math.min
  * Positions are fractions of the (landscape) screen so they survive resolution changes.
  */
 object Prefs {
-    class TapPoint(var code: Int, var fx: Float, var fy: Float)
+    /** fr = radius of the tap circle as a fraction of screen width; presses land randomly inside it. */
+    class TapPoint(var code: Int, var fx: Float, var fy: Float, var fr: Float = Prefs.DEFAULT_TAP_R)
+
+    const val DEFAULT_TAP_R = 0.021f
 
     class Layout(
         val taps: MutableList<TapPoint>,
@@ -22,7 +25,7 @@ object Prefs {
         var rtype: String = "flick"
     ) {
         fun copy(): Layout = Layout(
-            taps.map { TapPoint(it.code, it.fx, it.fy) }.toMutableList(),
+            taps.map { TapPoint(it.code, it.fx, it.fy, it.fr) }.toMutableList(),
             lfx, lfy, rfx, rfy, ltype, rtype
         )
     }
@@ -52,34 +55,43 @@ object Prefs {
         0.30f, 0.80f, 0.70f, 0.80f, "flick", "flick"
     )
 
-    /** Park: copied from the Lenovo mapper layout (screenshot positions / 2000x1253). */
+    /** Park: the user's chosen default (screenshot positions / 2000x1253). */
     private fun parkDefaults(): Layout = Layout(
         mutableListOf(
-            TapPoint(0x133, 0.171f, 0.842f), // X
-            TapPoint(0x134, 0.836f, 0.844f), // Y (jump)
-            TapPoint(0x131, 0.944f, 0.671f), // B
-            TapPoint(0x139, 0.859f, 0.778f), // R2
-            TapPoint(0x138, 0.715f, 0.886f), // L2
-            TapPoint(0x136, 0.318f, 0.848f), // L1
-            TapPoint(0x137, 0.678f, 0.848f), // R1
-            TapPoint(0x13d, 0.464f, 0.866f), // ThumbL
-            TapPoint(0x13e, 0.532f, 0.866f), // ThumbR
-            TapPoint(0x13a, 0.105f, 0.209f), // Select
-            TapPoint(0x13b, 0.958f, 0.070f)  // Start
+            TapPoint(0x13a, 0.110f, 0.214f), // Select (map)
+            TapPoint(0x13b, 0.958f, 0.070f), // Start (menu)
+            TapPoint(0x134, 0.922f, 0.438f), // Y (top prompt)
+            TapPoint(0x131, 0.924f, 0.525f), // B (middle prompt)
+            TapPoint(0x130, 0.927f, 0.612f), // A (bottom prompt)
+            TapPoint(0x133, 0.877f, 0.869f)  // X (jump)
         ),
-        0.183f, 0.611f, // left stick = walking joystick (Lenovo's WASD wheel)
-        0.797f, 0.642f, // right stick = camera (Lenovo's angle anchor)
+        0.194f, 0.796f, // left stick = walking joystick
+        0.810f, 0.683f, // right stick = camera
+        "joystick", "camera"
+    )
+
+    /** Minigame: the user's chosen default. */
+    private fun minigameDefaults(): Layout = Layout(
+        mutableListOf(
+            TapPoint(0x13a, 0.105f, 0.210f), // Select
+            TapPoint(0x13b, 0.958f, 0.070f), // Start
+            TapPoint(0x139, 0.859f, 0.778f), // R2
+            TapPoint(0x138, 0.715f, 0.886f)  // L2
+        ),
+        0.183f, 0.611f,
+        0.797f, 0.642f,
         "joystick", "camera"
     )
 
     fun defaults(mode: Int = 0): Layout = when (mode) {
-        1, 2 -> parkDefaults()
+        1 -> parkDefaults()
+        2 -> minigameDefaults()
         else -> liveDefaults()
     }
 
     private fun toJson(l: Layout): JSONObject {
         val arr = JSONArray()
-        for (t in l.taps) arr.put(JSONObject().put("code", t.code).put("fx", t.fx.toDouble()).put("fy", t.fy.toDouble()))
+        for (t in l.taps) arr.put(JSONObject().put("code", t.code).put("fx", t.fx.toDouble()).put("fy", t.fy.toDouble()).put("fr", t.fr.toDouble()))
         return JSONObject().put("taps", arr)
             .put("lfx", l.lfx.toDouble()).put("lfy", l.lfy.toDouble())
             .put("rfx", l.rfx.toDouble()).put("rfy", l.rfy.toDouble())
@@ -91,7 +103,7 @@ object Prefs {
         val taps = ArrayList<TapPoint>()
         for (i in 0 until arr.length()) {
             val t = arr.getJSONObject(i)
-            taps.add(TapPoint(t.getInt("code"), t.getDouble("fx").toFloat(), t.getDouble("fy").toFloat()))
+            taps.add(TapPoint(t.getInt("code"), t.getDouble("fx").toFloat(), t.getDouble("fy").toFloat(), t.optDouble("fr", DEFAULT_TAP_R.toDouble()).toFloat()))
         }
         Layout(
             taps,
@@ -110,9 +122,6 @@ object Prefs {
         // first run for this mode
         if (mode == 0) {
             sp.getString("layout", null)?.let { return fromJson(JSONObject(it), liveDefaults()) } // pre-modes save
-        }
-        if (mode == 2) {
-            sp.getString("layout_1", null)?.let { return fromJson(JSONObject(it), parkDefaults()) } // copy of Park
         }
         return defaults(mode)
     }
@@ -143,6 +152,7 @@ object Prefs {
     const val AXES = "rightAxes"     // auto | z | rx
     const val BG = "bgUri"
     const val MODE = "mode"          // starting mode index
+    const val KILL_PKG = "killPkg"   // mapper app to force-stop on Start ("" = off)
 
     fun screenSize(ctx: Context): Pair<Int, Int> {
         val wm = ctx.getSystemService(WindowManager::class.java)
@@ -176,6 +186,7 @@ object Prefs {
                 taps.put(
                     JSONObject().put("name", buttonName(t.code)).put("code", t.code)
                         .put("x", (t.fx * w).toDouble()).put("y", (t.fy * h).toDouble())
+                        .put("r", (t.fr * w).toDouble())
                 )
             }
             val sticks = JSONArray()

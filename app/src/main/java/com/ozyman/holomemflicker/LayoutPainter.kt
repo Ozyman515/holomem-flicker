@@ -27,12 +27,14 @@ class LayoutPainter(private val ctx: Context) {
         l.taps.forEachIndexed { i, t ->
             val x = t.fx * w
             val y = t.fy * h
-            fill.color = 0xAA2E7DFF.toInt()
-            c.drawCircle(x, y, 42f, fill)
+            val r = (t.fr * w).coerceAtLeast(26f)
+            fill.color = 0x772E7DFF
+            c.drawCircle(x, y, r, fill)
             ring.color = if (i == selected) Color.YELLOW else Color.WHITE
-            c.drawCircle(x, y, 42f, ring)
-            text.textSize = if (Prefs.buttonName(t.code).length > 3) 24f else 34f
-            c.drawText(Prefs.buttonName(t.code), x, y + 11f, text)
+            c.drawCircle(x, y, r, ring)
+            val label = if (t.code < 0) "?" else Prefs.buttonName(t.code)
+            text.textSize = if (label.length > 3) 24f else 34f
+            c.drawText(label, x, y + 11f, text)
         }
         text.textSize = 34f
     }

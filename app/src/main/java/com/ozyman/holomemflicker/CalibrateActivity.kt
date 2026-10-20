@@ -101,6 +101,8 @@ class CalibrateActivity : Activity() {
                 say("Deleted.")
             }
         }
+        btn("Size −") { resize(-1) }
+        btn("Size +") { resize(+1) }
         btn("Stick type") {
             when (selected) {
                 SEL_LEFT -> {
@@ -210,6 +212,16 @@ class CalibrateActivity : Activity() {
         board.invalidate()
     }
 
+    private fun resize(dir: Int) {
+        val t = data.taps.getOrNull(selected)
+        if (t == null) {
+            say("Tap a tap point first, then use Size − / Size + to change its circle.")
+            return
+        }
+        t.fr = (t.fr * if (dir > 0) 1.2f else 1 / 1.2f).coerceIn(0.008f, 0.15f)
+        say("${Prefs.buttonName(t.code)} circle: %.1f%% of screen width. Presses land randomly inside it.".format(t.fr * 100))
+    }
+
     private fun nextType(t: String): String {
         val i = Prefs.STICK_TYPES.indexOf(t)
         return Prefs.STICK_TYPES[(i + 1) % Prefs.STICK_TYPES.size]
@@ -250,7 +262,7 @@ class CalibrateActivity : Activity() {
             var best = SEL_NONE
             var bestD = 90f
             data.taps.forEachIndexed { i, t ->
-                val d = hypot(px(t.fx) - x, py(t.fy) - y)
+                val d = hypot(px(t.fx) - x, py(t.fy) - y) - maxOf(0f, t.fr * width - 45f)
                 if (d < bestD) { bestD = d; best = i }
             }
             val dl = hypot(px(data.lfx) - x, py(data.lfy) - y)

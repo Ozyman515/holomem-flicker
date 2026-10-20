@@ -88,6 +88,10 @@ class FlickService : IFlickService.Stub() {
         engine?.setOverlay(on)
     }
 
+    override fun setEditing(on: Boolean) {
+        engine?.setEditing(on)
+    }
+
     /** Shell can grant "Display over other apps" without a settings trip. */
     override fun grantOverlay(pkg: String?): String = try {
         val p = ProcessBuilder("appops", "set", pkg ?: "", "SYSTEM_ALERT_WINDOW", "allow")
@@ -95,6 +99,32 @@ class FlickService : IFlickService.Stub() {
         val out = p.inputStream.bufferedReader().readText().trim()
         p.waitFor()
         if (out.isEmpty()) "ok" else out
+    } catch (t: Throwable) {
+        "error: $t"
+    }
+
+    private fun run(vararg cmd: String): String {
+        val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText().trim()
+        p.waitFor()
+        return out
+    }
+
+    /** Installed packages that could be Lenovo's key mapper / game assistant. */
+    override fun findPackages(): String = try {
+        run("pm", "list", "packages").lines()
+            .map { it.removePrefix("package:").trim() }
+            .filter { Regex("lenovo|zui|legion|game|keymap|gamepad|assist", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+            .filter { !it.startsWith("com.ozyman") }
+            .sorted()
+            .joinToString("\n")
+    } catch (t: Throwable) {
+        "error: $t"
+    }
+
+    override fun forceStop(pkg: String?): String = try {
+        if (pkg.isNullOrBlank() || !Regex("^[A-Za-z0-9_.]+$").matches(pkg)) "bad package"
+        else run("am", "force-stop", pkg).ifEmpty { "stopped $pkg" }
     } catch (t: Throwable) {
         "error: $t"
     }

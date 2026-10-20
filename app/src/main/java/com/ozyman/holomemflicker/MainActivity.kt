@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var monitorText: TextView
     private lateinit var axesBtn: Button
     private lateinit var modeText: TextView
+    private lateinit var killText: TextView
 
     private val args by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, FlickService::class.java.name))
@@ -135,6 +136,15 @@ class MainActivity : Activity() {
         layoutText = label("")
         button("🎮 Controller test (buttons, sticks, and where touches land)") {
             startActivity(Intent(this, ControllerTestActivity::class.java))
+        }
+
+        label("Lenovo mapper", 18f).setTypeface(null, Typeface.BOLD)
+        killText = label("")
+        updateKillText()
+        button("Pick the mapper app to stop on Start") { pickMapper() }
+        button("Don't stop any app") {
+            Prefs.putStr(this, Prefs.KILL_PKG, "")
+            updateKillText()
         }
 
         label("Modes", 18f).setTypeface(null, Typeface.BOLD)
@@ -295,6 +305,8 @@ class MainActivity : Activity() {
 
     private fun doStart() {
         val s = service ?: return
+        val kill = Prefs.getStr(this, Prefs.KILL_PKG, "")
+        if (kill.isNotEmpty()) safe { s.forceStop(kill) }
         statusText.text = safe { s.start(Prefs.buildConfig(this)) } ?: "Engine call failed"
         if (!android.provider.Settings.canDrawOverlays(this)) safe { s.grantOverlay(packageName) }
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -310,6 +322,33 @@ class MainActivity : Activity() {
         service = null
         statusText.text = "Engine: stopped"
         monitorText.text = "-"
+    }
+
+    private fun updateKillText() {
+        val k = Prefs.getStr(this, Prefs.KILL_PKG, "")
+        killText.text = if (k.isEmpty()) "Not stopping any app on Start." else "On Start, force-stop: $k"
+    }
+
+    private fun pickMapper() {
+        val s = service
+        if (s == null) {
+            killText.text = "Start the flicker once first (it needs Shizuku), then pick."
+            return
+        }
+        val list = (safe { s.findPackages() } ?: "").lines().filter { it.isNotBlank() && !it.startsWith("error") }
+        if (list.isEmpty()) {
+            killText.text = "No Lenovo / game-assistant apps found."
+            return
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Which app is the key mapper?")
+            .setItems(list.toTypedArray()) { _, i ->
+                Prefs.putStr(this, Prefs.KILL_PKG, list[i])
+                updateKillText()
+                safe { s.forceStop(list[i]) }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun pickMode(i: Int) {

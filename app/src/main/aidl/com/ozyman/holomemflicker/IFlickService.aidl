@@ -15,4 +15,7 @@ interface IFlickService {
     void setMode(int mode) = 10;
     void setOverlay(boolean on) = 11;
     String grantOverlay(String pkg) = 12;
+    void setEditing(boolean on) = 13;
+    String findPackages() = 14;
+    String forceStop(String pkg) = 15;
 }

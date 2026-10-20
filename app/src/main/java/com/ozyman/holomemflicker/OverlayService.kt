@@ -48,6 +48,11 @@ class OverlayService : Service() {
     private var bannerUntil = 0L
     private val layouts = HashMap<Int, Prefs.Layout>()
 
+    // in-game editor
+    private var editor: Editor? = null
+    private var lastKeySeen = ""
+    private var pressedNow = HashSet<Int>()
+
     private val args by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, FlickService::class.java.name))
             .daemon(true)
@@ -80,6 +85,24 @@ class OverlayService : Service() {
                     if (newMode != modeIdx) Prefs.putInt(this@OverlayService, Prefs.MODE, newMode)
                     lastSeq = seq
                     modeIdx = newMode
+                    val keys = o.optJSONArray("keys")
+                    val pr = HashSet<Int>()
+                    if (keys != null) for (i in 0 until keys.length()) pr.add(keys.getInt(i))
+                    pressedNow = pr
+                    val editing = o.optBoolean("editing")
+                    val lk = o.optString("lastKey")
+                    val ed = editor
+                    if (editing && ed == null) {
+                        openEditor()
+                    } else if (!editing && ed != null && !ed.closing) {
+                        ed.saveAndClose(false) // closed with Select+Start: keep the changes
+                    }
+                    if (lk != lastKeySeen) {
+                        val code = lk.substringAfter(':').toIntOrNull()
+                        if (lastKeySeen.isNotEmpty() && code != null) editor?.onKey(code, pressedNow)
+                        lastKeySeen = lk
+                    }
+                    editor?.onPoll(pressedNow)
                 }
             } catch (_: Throwable) {
             }
@@ -109,6 +132,8 @@ class OverlayService : Service() {
     override fun onDestroy() {
         handler.removeCallbacks(poll)
         removeView()
+        editor?.remove()
+        editor = null
         try { Shizuku.unbindUserService(args, conn, false) } catch (_: Throwable) {}
         super.onDestroy()
     }
@@ -137,7 +162,7 @@ class OverlayService : Service() {
 
     private fun refresh() {
         val showBanner = SystemClock.uptimeMillis() < bannerUntil
-        val want = overlayOn || showBanner
+        val want = (overlayOn || showBanner) && editor == null
         if (want && view == null) addView()
         if (!want && view != null) removeView()
         view?.invalidate()
@@ -170,6 +195,220 @@ class OverlayService : Service() {
         val v = view ?: return
         try { wm?.removeView(v) } catch (_: Throwable) {}
         view = null
+    }
+
+    private fun openEditor() {
+        if (!Settings.canDrawOverlays(this)) return
+        removeView()
+        val e = Editor(modeIdx)
+        if (e.add()) editor = e
+    }
+
+    /**
+     * Lenovo-style editor drawn over the game. The window takes every touch, so the
+     * game can't be touched while it's open, and the engine sends no input either.
+     */
+    private inner class Editor(val mode: Int) {
+        val data: Prefs.Layout = Prefs.load(this@OverlayService, mode).copy()
+        var selected = Int.MIN_VALUE
+        var learning = false
+        var pendingSelect = false
+        var closing = false
+        private val ctx = android.view.ContextThemeWrapper(this@OverlayService, android.R.style.Theme_Material)
+        private val root = android.widget.FrameLayout(ctx)
+        private val board = Board()
+        private val banner = android.widget.TextView(ctx)
+
+        fun add(): Boolean {
+            root.addView(board, android.widget.FrameLayout.LayoutParams(-1, -1))
+            val col = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.VERTICAL }
+            val bar = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+            fun btn(label: String, f: () -> Unit) = bar.addView(android.widget.Button(ctx).apply {
+                text = label
+                isAllCaps = false
+                setOnClickListener { f() }
+            })
+            btn("Size −") { resize(-1) }
+            btn("Size +") { resize(+1) }
+            btn("Delete") { delete() }
+            btn("Stick type") { stickType() }
+            btn("Reset") {
+                val d = Prefs.defaults(mode)
+                data.taps.clear(); data.taps.addAll(d.taps)
+                data.lfx = d.lfx; data.lfy = d.lfy; data.rfx = d.rfx; data.rfy = d.rfy
+                data.ltype = d.ltype; data.rtype = d.rtype
+                selected = Int.MIN_VALUE
+                say("Back to the default ${Prefs.MODE_NAMES[mode]} layout (not saved yet).")
+            }
+            btn("Save") { saveAndClose(true) }
+            btn("Exit") { close(true) }
+            col.addView(bar)
+            banner.setTextColor(Color.WHITE)
+            banner.setBackgroundColor(0xCC000000.toInt())
+            banner.setPadding(24, 8, 24, 8)
+            col.addView(banner)
+            root.addView(col, android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+            say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select / drag it.")
+            val lp = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            )
+            lp.gravity = Gravity.TOP or Gravity.START
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            return try {
+                wm?.addView(root, lp)
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
+        fun remove() {
+            try { wm?.removeView(root) } catch (_: Throwable) {}
+        }
+
+        fun say(t: String) {
+            banner.text = t
+            board.invalidate()
+        }
+
+        /** A controller button was pressed while the editor is open. */
+        fun onKey(code: Int, pressed: Set<Int>) {
+            if (code == 0x13a) { // Select: maybe a combo, maybe an assignment - decide on release
+                pendingSelect = true
+                return
+            }
+            if (pressed.contains(0x13a)) { // part of a Select combo
+                pendingSelect = false
+                return
+            }
+            pendingSelect = false
+            assign(code)
+        }
+
+        fun onPoll(pressed: Set<Int>) {
+            if (pendingSelect && !pressed.contains(0x13a)) {
+                pendingSelect = false
+                assign(0x13a)
+            }
+        }
+
+        private fun assign(code: Int) {
+            val t = data.taps.getOrNull(selected) ?: return
+            if (!learning) return
+            t.code = code
+            learning = false
+            say("Point set to ${Prefs.buttonName(code)}. Drag to move, Size −/+ to resize.")
+        }
+
+        private fun resize(dir: Int) {
+            val t = data.taps.getOrNull(selected) ?: return say("Tap a point first.")
+            t.fr = (t.fr * if (dir > 0) 1.2f else 1 / 1.2f).coerceIn(0.008f, 0.15f)
+            say("Circle: %.1f%% of screen width. Presses land randomly inside it.".format(t.fr * 100))
+        }
+
+        private fun delete() {
+            if (selected < 0) return say("Tap a point first. (Sticks can't be deleted - set their type to off.)")
+            data.taps.removeAt(selected)
+            selected = Int.MIN_VALUE
+            learning = false
+            say("Deleted.")
+        }
+
+        private fun stickType() {
+            fun next(t: String) = Prefs.STICK_TYPES[(Prefs.STICK_TYPES.indexOf(t) + 1) % Prefs.STICK_TYPES.size]
+            when (selected) {
+                -1 -> { data.ltype = next(data.ltype); say("Left stick: ${data.ltype}") }
+                -2 -> { data.rtype = next(data.rtype); say("Right stick: ${data.rtype}") }
+                else -> say("Tap a stick circle first.")
+            }
+        }
+
+        fun saveAndClose(tellEngine: Boolean) {
+            data.taps.removeAll { it.code < 0 }
+            Prefs.save(this@OverlayService, mode, data)
+            layouts.clear()
+            closing = true
+            remove()
+            editor = null
+            val s = service
+            Thread {
+                try {
+                    if (tellEngine) s?.setEditing(false)
+                    s?.start(Prefs.buildConfig(this@OverlayService)) // reload with the new layout
+                } catch (_: Throwable) {
+                }
+            }.start()
+            bannerUntil = SystemClock.uptimeMillis() + 1200
+            modeName = "Saved · " + Prefs.MODE_NAMES.getOrElse(mode) { "" }
+        }
+
+        fun close(tellEngine: Boolean) {
+            closing = true
+            remove()
+            editor = null
+            if (tellEngine) try { service?.setEditing(false) } catch (_: Throwable) {}
+        }
+
+        private inner class Board : View(ctx) {
+            private val painter = LayoutPainter(ctx)
+            private var dragging = Int.MIN_VALUE
+
+            override fun onDraw(c: Canvas) {
+                c.drawColor(0x55000000)
+                painter.draw(c, width.toFloat(), height.toFloat(), data, selected)
+            }
+
+            private fun hit(x: Float, y: Float): Int {
+                var best = Int.MIN_VALUE
+                var bestD = 90f
+                data.taps.forEachIndexed { i, t ->
+                    val d = Math.hypot((t.fx * width - x).toDouble(), (t.fy * height - y).toDouble()).toFloat() -
+                        maxOf(0f, t.fr * width - 45f)
+                    if (d < bestD) { bestD = d; best = i }
+                }
+                val dl = Math.hypot((data.lfx * width - x).toDouble(), (data.lfy * height - y).toDouble()).toFloat()
+                if (dl < bestD) { bestD = dl; best = -1 }
+                val dr = Math.hypot((data.rfx * width - x).toDouble(), (data.rfy * height - y).toDouble()).toFloat()
+                if (dr < bestD) best = -2
+                return best
+            }
+
+            override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
+                val fx = (e.x / width).coerceIn(0f, 1f)
+                val fy = (e.y / height).coerceIn(0f, 1f)
+                when (e.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        val h = hit(e.x, e.y)
+                        if (h == Int.MIN_VALUE) {
+                            data.taps.add(Prefs.TapPoint(-1, fx, fy))
+                            selected = data.taps.size - 1
+                            learning = true
+                            say("New point - press the controller button for it.")
+                        } else {
+                            selected = h
+                            learning = h >= 0
+                            if (h >= 0) say("${Prefs.buttonName(data.taps[h].code)} selected. Drag, resize, delete, or press a button to reassign.")
+                            else say("${if (h == -1) "Left" else "Right"} stick selected. Drag it, or tap Stick type.")
+                        }
+                        dragging = selected
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> when {
+                        dragging == -1 -> { data.lfx = fx; data.lfy = fy }
+                        dragging == -2 -> { data.rfx = fx; data.rfy = fy }
+                        dragging >= 0 -> data.taps.getOrNull(dragging)?.let { it.fx = fx; it.fy = fy }
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> dragging = Int.MIN_VALUE
+                }
+                invalidate()
+                return true
+            }
+        }
     }
 
     private inner class OverlayView(ctx: Context) : View(ctx) {
