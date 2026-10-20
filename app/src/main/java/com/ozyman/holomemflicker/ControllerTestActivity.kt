@@ -358,7 +358,7 @@ class ControllerTestActivity : Activity() {
                 ty += h * 0.035f
             }
             say("CONTROLLER TEST", Color.WHITE)
-            line(if (engineOk) "■ cyan = flicker engine sees it ($eDevice)" else "■ flicker engine: not running (start it on the main screen)", cyan)
+            say(if (engineOk) "■ cyan = flicker engine sees it ($eDevice)" else "■ flicker engine: not running (start it on the main screen)", cyan)
             say("■ orange = Android sees it (with no flicker)", orange)
             say("Engine buttons: " + eKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Android buttons: " + aKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
