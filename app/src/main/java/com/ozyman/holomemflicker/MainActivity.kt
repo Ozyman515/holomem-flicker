@@ -16,12 +16,20 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.view.View
+import org.json.JSONObject
 import rikka.shizuku.Shizuku
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : Activity() {
 
     private var service: IFlickService? = null
     private var pendingStart = false
+    private var pendingInstall = false
+    private var updateUrl: String? = null
+    private lateinit var updateText: TextView
+    private lateinit var updateBtn: Button
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var shizukuText: TextView
@@ -42,7 +50,10 @@ class MainActivity : Activity() {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             if (binder == null || !binder.pingBinder()) return
             service = IFlickService.Stub.asInterface(binder)
-            if (pendingStart) {
+            if (pendingInstall) {
+                pendingInstall = false
+                doInstall()
+            } else if (pendingStart) {
                 pendingStart = false
                 doStart()
             } else {
@@ -108,6 +119,10 @@ class MainActivity : Activity() {
         label("Holomem Flicker", 26f).setTypeface(null, Typeface.BOLD)
         label("Turn the Lenovo key mapper OFF (or use an empty profile) while this is running, or every press counts twice.", 14f)
 
+        updateText = label("Version v${BuildConfig.VERSION_CODE}")
+        button("Check for updates") { checkUpdate() }
+        updateBtn = button("Install update") { installUpdate() }.apply { visibility = View.GONE }
+
         shizukuText = label("Shizuku: checking…")
         button("Grant Shizuku access") { requestShizuku() }
 
@@ -169,6 +184,7 @@ class MainActivity : Activity() {
         Shizuku.addBinderReceivedListenerSticky(binderListener)
         Shizuku.addBinderDeadListener(deadListener)
         Shizuku.addRequestPermissionResultListener(permListener)
+        checkUpdate()
     }
 
     override fun onResume() {
@@ -249,6 +265,79 @@ class MainActivity : Activity() {
         service = null
         statusText.text = "Engine: stopped"
         monitorText.text = "-"
+    }
+
+    private fun checkUpdate() {
+        updateText.text = "Version v${BuildConfig.VERSION_CODE} — checking for updates…"
+        Thread {
+            val result: Pair<Int, String?>? = try {
+                val c = URL("https://api.github.com/repos/Ozyman515/holomem-flicker/releases/latest")
+                    .openConnection() as HttpURLConnection
+                c.setRequestProperty("Accept", "application/vnd.github+json")
+                c.connectTimeout = 10000
+                c.readTimeout = 10000
+                val o = JSONObject(c.inputStream.bufferedReader().readText())
+                c.disconnect()
+                val tag = o.optString("tag_name").removePrefix("v").toIntOrNull() ?: 0
+                val assets = o.optJSONArray("assets")
+                var url: String? = null
+                if (assets != null) for (i in 0 until assets.length()) {
+                    val a = assets.getJSONObject(i)
+                    if (a.optString("name").endsWith(".apk")) url = a.optString("browser_download_url")
+                }
+                tag to url
+            } catch (t: Throwable) {
+                null
+            }
+            runOnUiThread {
+                val mine = BuildConfig.VERSION_CODE
+                when {
+                    result == null -> updateText.text = "Version v$mine — couldn't reach GitHub."
+                    result.first > mine && result.second != null -> {
+                        updateUrl = result.second
+                        updateText.text = "Version v$mine — update v${result.first} is available!"
+                        updateBtn.text = "Install update v${result.first}"
+                        updateBtn.visibility = View.VISIBLE
+                    }
+                    else -> {
+                        updateText.text = "Version v$mine — up to date ✓"
+                        updateBtn.visibility = View.GONE
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun installUpdate() {
+        if (!shizukuReady()) {
+            updateText.text = "Updating needs Shizuku running. Start Shizuku first."
+            return
+        }
+        if (service == null) {
+            pendingInstall = true
+            updateText.text = "Connecting…"
+            try {
+                Shizuku.bindUserService(args, conn)
+            } catch (t: Throwable) {
+                updateText.text = "Bind failed: $t"
+            }
+        } else {
+            doInstall()
+        }
+    }
+
+    private fun doInstall() {
+        val s = service ?: return
+        val url = updateUrl ?: return
+        updateText.text = "Downloading and installing… the app will close when it's done. Reopen it after."
+        updateBtn.isEnabled = false
+        Thread {
+            val r = safe { s.installUpdate(url) } ?: "install call failed"
+            runOnUiThread {
+                updateBtn.isEnabled = true
+                updateText.text = "Update result: $r"
+            }
+        }.start()
     }
 
     private fun cycleAxes() {

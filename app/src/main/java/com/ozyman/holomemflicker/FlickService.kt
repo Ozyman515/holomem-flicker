@@ -55,6 +55,29 @@ class FlickService : IFlickService.Stub() {
         "touch error: ${e.cause ?: e}"
     }
 
+    /** Download the APK as the shell user and install it with pm (no installer prompt). */
+    override fun installUpdate(url: String?): String = try {
+        val dest = java.io.File("/data/local/tmp/holomem-flicker-update.apk")
+        var conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        var hops = 0
+        while (conn.responseCode in 300..399 && hops < 5) {
+            val next = conn.getHeaderField("Location")
+            conn.disconnect()
+            conn = java.net.URL(java.net.URL(url), next).openConnection() as java.net.HttpURLConnection
+            hops++
+        }
+        if (conn.responseCode != 200) throw RuntimeException("download HTTP ${conn.responseCode}")
+        conn.inputStream.use { inp -> dest.outputStream().use { out -> inp.copyTo(out) } }
+        conn.disconnect()
+        val p = ProcessBuilder("pm", "install", "-r", dest.absolutePath).redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText().trim()
+        p.waitFor()
+        dest.delete()
+        out
+    } catch (t: Throwable) {
+        "update failed: $t"
+    }
+
     override fun listDevices(): String = try {
         DeviceScanner.scan().joinToString("\n")
     } catch (t: Throwable) {
