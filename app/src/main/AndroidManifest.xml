@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Holomem Flicker"
@@ -29,6 +33,15 @@
             android:exported="false"
             android:screenOrientation="sensorLandscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+
+        <service
+            android:name=".OverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Shows the controller-to-touch layout overlay while a game is played" />
+        </service>
 
         <provider
             android:name="rikka.shizuku.ShizukuProvider"

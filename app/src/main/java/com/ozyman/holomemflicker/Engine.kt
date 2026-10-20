@@ -5,32 +5,44 @@ import org.json.JSONObject
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.hypot
 import kotlin.math.min
 
 /**
  * Reads the controller straight from /dev/input (works as the shell user)
- * and turns it into touches:
- *  - tap slots: a button held = a finger held at that spot
- *  - sticks: "steering wheel" flick. Finger goes down at the base point
- *    (shifted sideways by the push direction for edge reach), then follows
- *    the stick outward. The fast jump is what the game reads as a flick.
+ * and turns it into touches, using one of several MODES (Live / Park / Minigame):
+ *  - tap points: a button held = a finger held at that spot (several per button allowed)
+ *  - sticks, per mode:
+ *      flick    : finger down at the base (shifted sideways by push direction), follows the stick
+ *      joystick : same, without the sideways shift - a virtual joystick for walking
+ *      camera   : continuous swipe from an anchor while the stick is held (re-anchors at the edge)
+ *      off
+ *  - combos: hold the MODIFIER (Select). Select+L1 = overlay on/off, Select+R1 = next mode.
+ *    Buttons pressed while Select is held never tap. Select alone taps (on release) if mapped.
  */
 class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
-    private class Tap(val name: String, val code: Int, val x: Float, val y: Float) {
+    private class Tap(val code: Int, val x: Float, val y: Float) {
         var pid = -1
     }
 
     private class Stick(
-        val name: String, val ax: Int, val ay: Int,
-        val bx: Float, val by: Float
+        val name: String, val type: String, val ax: Int, val ay: Int,
+        val bx: Float, val by: Float, val radius: Float, val reach: Float, val dead: Float
     ) {
         var pid = -1
         var sx = 0f
         var sy = 0f
+        var px = 0f
+        var py = 0f
         var lastX = 0f
         var lastY = 0f
+    }
+
+    private class Mode(val name: String, val taps: List<Tap>, val stickCfg: List<JSONObject>) {
+        val sticks = ArrayList<Stick>()
     }
 
     @Volatile private var running = true
@@ -44,17 +56,26 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     private val forcedPath = cfg.optString("devicePath", "")
     private val rightAxes = cfg.optString("rightAxes", "auto")
-    private val radius = cfg.optDouble("radius", 120.0).toFloat()
-    private val reach = cfg.optDouble("reach", 400.0).toFloat()
-    private val dead = cfg.optDouble("dead", 0.35).toFloat()
     private val screenW = cfg.optDouble("screenW", 2560.0).toFloat()
     private val screenH = cfg.optDouble("screenH", 1600.0).toFloat()
+    private val modKey = cfg.optInt("modKey", 0x13a)
+    private val overlayKey = cfg.optInt("overlayKey", 0x136)
+    private val modeKey = cfg.optInt("modeKey", 0x137)
 
-    private val taps = ArrayList<Tap>()
-    private val sticks = ArrayList<Stick>()
-    private val stickCfg = ArrayList<JSONObject>()
+    private val modes = ArrayList<Mode>()
+    @Volatile var modeIdx = 0
+        private set
+    @Volatile var overlayOn = false
+        private set
+    @Volatile var modeSeq = 0
+        private set
+
+    private var modHeld = false
+    private var comboUsed = false
+    private val suppressed = HashSet<Int>()
 
     private val recent = ArrayDeque<String>()
+    private val timer = Executors.newSingleThreadScheduledExecutor()
 
     /** One input node being read. Several are read at once, because system mappers
      *  (Lenovo's included) may hide the real controller behind a virtual one. */
@@ -109,8 +130,44 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private val pressed = HashSet<Int>()
     @Volatile private var rAx = 2
     @Volatile private var rAy = 5
+    @Volatile private var active: Reader? = null
+    private var inj: TouchInjector? = null
 
-    /** Snapshot for the controller test screen. */
+    init {
+        modeIdx = cfg.optInt("mode", 0)
+        val ma = cfg.optJSONArray("modes")
+        if (ma != null && ma.length() > 0) {
+            for (i in 0 until ma.length()) modes.add(parseMode(ma.getJSONObject(i)))
+        } else {
+            // old single-layout config
+            modes.add(parseMode(cfg.put("name", "Live")))
+        }
+        if (modeIdx !in modes.indices) modeIdx = 0
+    }
+
+    private fun parseMode(o: JSONObject): Mode {
+        val taps = ArrayList<Tap>()
+        val ta = o.optJSONArray("taps")
+        if (ta != null) for (i in 0 until ta.length()) {
+            val t = ta.getJSONObject(i)
+            taps.add(Tap(t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat()))
+        }
+        val sc = ArrayList<JSONObject>()
+        val sa = o.optJSONArray("sticks")
+        if (sa != null) for (i in 0 until sa.length()) sc.add(sa.getJSONObject(i))
+        return Mode(o.optString("name", "Mode"), taps, sc)
+    }
+
+    private fun note(s: String) {
+        synchronized(recent) {
+            recent.addLast(s)
+            while (recent.size > 10) recent.removeFirst()
+        }
+    }
+
+    private val mode: Mode get() = modes[modeIdx]
+
+    /** Snapshot for the controller test screen and the overlay. */
     @Synchronized
     fun stateJson(): String {
         val o = JSONObject()
@@ -123,42 +180,50 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("ry", rAy)
         o.put("device", a?.dev?.name ?: "")
         o.put("fingers", inj?.count() ?: 0)
+        o.put("mode", modeIdx)
+        o.put("modeName", if (modes.isEmpty()) "" else mode.name)
+        o.put("overlay", overlayOn)
+        o.put("modeSeq", modeSeq)
+        o.put("running", status.startsWith("Running"))
         return o.toString()
-    }
-    @Volatile private var active: Reader? = null
-
-    private var inj: TouchInjector? = null
-
-    init {
-        val ta = cfg.optJSONArray("taps")
-        if (ta != null) for (i in 0 until ta.length()) {
-            val o = ta.getJSONObject(i)
-            taps.add(Tap(o.optString("name"), o.optInt("code"), o.optDouble("x").toFloat(), o.optDouble("y").toFloat()))
-        }
-        val sa = cfg.optJSONArray("sticks")
-        if (sa != null) for (i in 0 until sa.length()) stickCfg.add(sa.getJSONObject(i))
-    }
-
-    private fun note(s: String) {
-        synchronized(recent) {
-            recent.addLast(s)
-            while (recent.size > 10) recent.removeFirst()
-        }
     }
 
     fun shutdown() {
         running = false
         for (r in readers) try { r.stream?.close() } catch (_: Throwable) {}
         try { inj?.releaseAll() } catch (_: Throwable) {}
+        timer.shutdownNow()
+    }
+
+    @Synchronized
+    fun setMode(i: Int) {
+        if (i !in modes.indices) return
+        releaseMode()
+        modeIdx = i
+        modeSeq++
+        note("mode → ${mode.name}")
+    }
+
+    @Synchronized
+    fun setOverlay(on: Boolean) {
+        overlayOn = on
+    }
+
+    private fun releaseMode() {
+        val injector = inj ?: return
+        for (t in mode.taps) if (t.pid >= 0) { injector.up(t.pid); t.pid = -1 }
+        for (s in mode.sticks) if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
     }
 
     fun monitorText(): String {
         val sb = StringBuilder(status).append('\n')
+        sb.append("Mode: ").append(if (modes.isEmpty()) "-" else mode.name)
+            .append("   overlay: ").append(if (overlayOn) "on" else "off").append('\n')
         val a = active
-        for (s in sticks) {
+        if (modes.isNotEmpty()) for (s in mode.sticks) {
             val x = a?.norm(s.ax) ?: 0f
             val y = a?.norm(s.ay) ?: 0f
-            sb.append("%s  x=%+.2f y=%+.2f %s\n".format(s.name, x, y, if (s.pid >= 0) "FLICK" else ""))
+            sb.append("%s [%s]  x=%+.2f y=%+.2f %s\n".format(s.name, s.type, x, y, if (s.pid >= 0) "ACTIVE" else ""))
         }
         val i = inj
         sb.append("controller events read: $nEvents (buttons: $nKeys)\n")
@@ -179,6 +244,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         } finally {
             try { inj?.releaseAll() } catch (_: Throwable) {}
             if (status.startsWith("Running")) status = "stopped"
+            timer.shutdownNow()
         }
     }
 
@@ -201,15 +267,25 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         }
         rAx = right.first
         rAy = right.second
-        for (o in stickCfg) {
+        for (m in modes) for (o in m.stickCfg) {
             val isRight = o.optString("side") == "right"
             val (ax, ay) = if (isRight) right else (0 to 1)
-            sticks.add(Stick(o.optString("name"), ax, ay, o.optDouble("x").toFloat(), o.optDouble("y").toFloat()))
+            m.sticks.add(
+                Stick(
+                    o.optString("name", if (isRight) "Right stick" else "Left stick"),
+                    o.optString("type", "flick"), ax, ay,
+                    o.optDouble("x").toFloat(), o.optDouble("y").toFloat(),
+                    o.optDouble("radius", 120.0).toFloat(),
+                    o.optDouble("reach", 0.0).toFloat(),
+                    o.optDouble("dead", 0.35).toFloat()
+                )
+            )
         }
         for (d in cands) readers.add(Reader(d))
         active = readers.firstOrNull { it.dev === main }
         status = "Running: listening to ${readers.size} input device(s), main = ${main.name}, right stick axes %02x/%02x"
             .format(right.first, right.second)
+        timer.scheduleAtFixedRate(Runnable { tick() }, 16, 16, TimeUnit.MILLISECONDS)
         for (r in readers) r.start()
         for (r in readers) r.join()
     }
@@ -220,30 +296,68 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         nEvents++
         if (type == 1) nKeys++
         when (type) {
-            1 -> { // EV_KEY
-                if (value == 2) return
-                if (value == 1) pressed.add(code) else pressed.remove(code)
-                if (value == 1) {
-                    keySeq++
-                    lastKey = "$keySeq:$code"
-                }
-                note("${r.dev.path} button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
-                for (t in taps) {
-                    if (t.code != code) continue
-                    if (value == 1 && t.pid < 0) {
-                        t.pid = injector.down(t.x, t.y)
-                    } else if (value == 0 && t.pid >= 0) {
-                        injector.up(t.pid)
-                        t.pid = -1
-                    }
-                }
-            }
+            1 -> key(injector, r, code, value)
             3 -> { // EV_ABS
                 r.raw[code] = value
                 active = r
             }
-            0 -> if (code == 0 && active === r) for (s in sticks) stick(injector, r, s) // SYN_REPORT
+            0 -> if (code == 0 && active === r) for (s in mode.sticks) stick(injector, r, s) // SYN_REPORT
         }
+    }
+
+    private fun key(injector: TouchInjector, r: Reader, code: Int, value: Int) {
+        if (value == 2) return
+        if (value == 1) pressed.add(code) else pressed.remove(code)
+        if (value == 1) {
+            keySeq++
+            lastKey = "$keySeq:$code"
+        }
+        note("${r.dev.path} button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
+
+        // ---- modifier / combos ----
+        if (code == modKey) {
+            if (value == 1) {
+                modHeld = true
+                comboUsed = false
+            } else {
+                modHeld = false
+                if (!comboUsed) quickTap(injector, code) // Select alone = its own tap
+            }
+            return
+        }
+        if (value == 1 && modHeld) {
+            comboUsed = true
+            suppressed.add(code)
+            when (code) {
+                overlayKey -> {
+                    overlayOn = !overlayOn
+                    note("overlay ${if (overlayOn) "on" else "off"}")
+                }
+                modeKey -> setMode((modeIdx + 1) % modes.size)
+            }
+            return
+        }
+        if (value == 0 && suppressed.remove(code)) return
+
+        // ---- normal taps ----
+        for (t in mode.taps) {
+            if (t.code != code) continue
+            if (value == 1 && t.pid < 0) {
+                t.pid = injector.down(t.x, t.y)
+            } else if (value == 0 && t.pid >= 0) {
+                injector.up(t.pid)
+                t.pid = -1
+            }
+        }
+    }
+
+    /** Short tap at every point mapped to [code] in the current mode. */
+    private fun quickTap(injector: TouchInjector, code: Int) {
+        val ids = mode.taps.filter { it.code == code }.map { injector.down(it.x, it.y) }
+        if (ids.isEmpty()) return
+        timer.schedule(Runnable {
+            synchronized(this@Engine) { for (id in ids) injector.up(id) }
+        }, 70, TimeUnit.MILLISECONDS)
     }
 
     private fun stick(injector: TouchInjector, r: Reader, s: Stick) {
@@ -252,23 +366,72 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         if (x == s.lastX && y == s.lastY) return
         s.lastX = x
         s.lastY = y
+        when (s.type) {
+            "flick", "joystick" -> wheel(injector, s, x, y)
+            // camera handled by the ticker
+        }
+    }
+
+    /** Steering-wheel behaviour (flick and joystick). */
+    private fun wheel(injector: TouchInjector, s: Stick, x: Float, y: Float) {
         val mag = hypot(x, y)
         if (s.pid < 0) {
-            if (mag >= dead) {
+            if (mag >= s.dead) {
                 val ux = x / mag
-                s.sx = (s.bx + ux * reach).coerceIn(1f, screenW - 1f)
+                s.sx = (s.bx + ux * s.reach).coerceIn(1f, screenW - 1f)
                 s.sy = s.by.coerceIn(1f, screenH - 1f)
                 s.pid = injector.down(s.sx, s.sy)
-                note("${s.name} flick at ${s.sx.toInt()},${s.sy.toInt()}")
+                if (s.type == "flick") note("${s.name} flick at ${s.sx.toInt()},${s.sy.toInt()}")
             }
-        } else if (mag < dead * 0.6f) {
+        } else if (mag < s.dead * 0.6f) {
             injector.up(s.pid)
             s.pid = -1
         } else {
-            val m = min(mag, 1f) * radius / mag
+            val m = min(mag, 1f) * s.radius / mag
             val tx = (s.sx + x * m).coerceIn(1f, screenW - 1f)
             val ty = (s.sy + y * m).coerceIn(1f, screenH - 1f)
             injector.move(s.pid, tx, ty)
+        }
+    }
+
+    /** 60 Hz ticker: camera sticks keep swiping while held. */
+    private fun tick() {
+        try {
+            synchronized(this) {
+                val injector = inj ?: return
+                val a = active ?: return
+                if (modes.isEmpty()) return
+                for (s in mode.sticks) {
+                    if (s.type != "camera") continue
+                    val x = a.norm(s.ax)
+                    val y = a.norm(s.ay)
+                    val mag = hypot(x, y)
+                    if (s.pid < 0) {
+                        if (mag >= s.dead) {
+                            s.px = s.bx
+                            s.py = s.by
+                            s.pid = injector.down(s.px, s.py)
+                        }
+                    } else if (mag < s.dead * 0.6f) {
+                        injector.up(s.pid)
+                        s.pid = -1
+                    } else {
+                        // radius = pixels per tick at full tilt
+                        s.px = (s.px + x * s.radius).coerceIn(1f, screenW - 1f)
+                        s.py = (s.py + y * s.radius).coerceIn(1f, screenH - 1f)
+                        injector.move(s.pid, s.px, s.py)
+                        val maxDrag = screenW * 0.18f
+                        if (hypot(s.px - s.bx, s.py - s.by) > maxDrag) {
+                            // lift and re-anchor so the swipe can keep going
+                            injector.up(s.pid)
+                            s.px = s.bx
+                            s.py = s.by
+                            s.pid = injector.down(s.px, s.py)
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {
         }
     }
 }

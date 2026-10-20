@@ -31,6 +31,7 @@ import kotlin.math.hypot
 class CalibrateActivity : Activity() {
 
     private lateinit var data: Prefs.Layout
+    private var modeIdx = 0
     private lateinit var board: Board
     private lateinit var banner: TextView
     private var bg: Bitmap? = null
@@ -50,7 +51,8 @@ class CalibrateActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        data = Prefs.load(this)
+        modeIdx = intent.getIntExtra("mode", 0)
+        data = Prefs.load(this, modeIdx)
 
         window.attributes.layoutInDisplayCutoutMode =
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -92,20 +94,33 @@ class CalibrateActivity : Activity() {
         btn("Delete") {
             val i = selected
             if (i < 0) {
-                say("Tap a tap point first to select it. (Flick points can't be deleted.)")
+                say("Tap a tap point first to select it. (Sticks can't be deleted - set their type to off.)")
             } else {
                 data.taps.removeAt(i)
                 selected = SEL_NONE
                 say("Deleted.")
             }
         }
+        btn("Stick type") {
+            when (selected) {
+                SEL_LEFT -> {
+                    data.ltype = nextType(data.ltype)
+                    say("Left stick is now: ${data.ltype}")
+                }
+                SEL_RIGHT -> {
+                    data.rtype = nextType(data.rtype)
+                    say("Right stick is now: ${data.rtype}")
+                }
+                else -> say("Tap a stick circle first, then tap Stick type to switch flick / joystick / camera / off.")
+            }
+        }
         btn("Reset") {
-            data = Prefs.defaults()
+            data = Prefs.defaults(modeIdx)
             selected = SEL_NONE
             say("Back to the default layout (not saved yet).")
         }
         btn("Save") {
-            Prefs.save(this, data)
+            Prefs.save(this, modeIdx, data)
             finish()
         }
         btn("Cancel") { finish() }
@@ -114,7 +129,7 @@ class CalibrateActivity : Activity() {
             setTextColor(Color.WHITE)
             setBackgroundColor(0x99000000.toInt())
             setPadding(24, 8, 24, 8)
-            text = "Drag markers. Tap a point to select it. Several points can share one button."
+            text = "Editing ${Prefs.MODE_NAMES.getOrElse(modeIdx) { "?" }} mode. Drag markers; tap one to select it. Several points can share one button."
         }
         col.addView(banner)
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -195,7 +210,13 @@ class CalibrateActivity : Activity() {
         board.invalidate()
     }
 
+    private fun nextType(t: String): String {
+        val i = Prefs.STICK_TYPES.indexOf(t)
+        return Prefs.STICK_TYPES[(i + 1) % Prefs.STICK_TYPES.size]
+    }
+
     private inner class Board(ctx: Context) : View(ctx) {
+        private val painter = LayoutPainter(ctx)
         private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
         private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -222,31 +243,7 @@ class CalibrateActivity : Activity() {
                 fill.color = 0x55FFFFFF
                 c.drawRect(0f, height * 0.77f, width.toFloat(), height * 0.78f, fill)
             }
-            val radius = Prefs.getInt(context, Prefs.RADIUS, 50) / 1000f * width
-            val reach = Prefs.getInt(context, Prefs.REACH, 18) / 100f * width
-            drawFlick(c, "L flick", data.lfx, data.lfy, radius, reach, selected == SEL_LEFT)
-            drawFlick(c, "R flick", data.rfx, data.rfy, radius, reach, selected == SEL_RIGHT)
-            data.taps.forEachIndexed { i, t ->
-                val x = px(t.fx)
-                val y = py(t.fy)
-                fill.color = 0xAA2E7DFF.toInt()
-                c.drawCircle(x, y, 42f, fill)
-                ring.color = if (i == selected) Color.YELLOW else Color.WHITE
-                c.drawCircle(x, y, 42f, ring)
-                c.drawText(Prefs.buttonName(t.code), x, y + 12f, text)
-            }
-        }
-
-        private fun drawFlick(c: Canvas, label: String, fx: Float, fy: Float, r: Float, reach: Float, sel: Boolean) {
-            val x = px(fx)
-            val y = py(fy)
-            ring.color = 0x88FF66CC.toInt()
-            c.drawLine(x - reach, y, x + reach, y, ring)
-            fill.color = 0x66FF66CC
-            c.drawCircle(x, y, r, fill)
-            ring.color = if (sel) Color.YELLOW else 0xFFFF66CC.toInt()
-            c.drawCircle(x, y, r, ring)
-            c.drawText(label, x, y - r - 12f, text)
+            painter.draw(c, width.toFloat(), height.toFloat(), data, selected)
         }
 
         private fun hit(x: Float, y: Float): Int {

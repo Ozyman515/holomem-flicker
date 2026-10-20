@@ -80,6 +80,25 @@ class FlickService : IFlickService.Stub() {
 
     override fun inputState(): String = engine?.stateJson() ?: "{}"
 
+    override fun setMode(mode: Int) {
+        engine?.setMode(mode)
+    }
+
+    override fun setOverlay(on: Boolean) {
+        engine?.setOverlay(on)
+    }
+
+    /** Shell can grant "Display over other apps" without a settings trip. */
+    override fun grantOverlay(pkg: String?): String = try {
+        val p = ProcessBuilder("appops", "set", pkg ?: "", "SYSTEM_ALERT_WINDOW", "allow")
+            .redirectErrorStream(true).start()
+        val out = p.inputStream.bufferedReader().readText().trim()
+        p.waitFor()
+        if (out.isEmpty()) "ok" else out
+    } catch (t: Throwable) {
+        "error: $t"
+    }
+
     override fun listDevices(): String = try {
         DeviceScanner.scan().joinToString("\n")
     } catch (t: Throwable) {

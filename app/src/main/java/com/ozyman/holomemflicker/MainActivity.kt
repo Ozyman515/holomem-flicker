@@ -7,6 +7,7 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
     private lateinit var layoutText: TextView
     private lateinit var monitorText: TextView
     private lateinit var axesBtn: Button
+    private lateinit var modeText: TextView
 
     private val args by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, FlickService::class.java.name))
@@ -134,14 +136,42 @@ class MainActivity : Activity() {
         button("🎮 Controller test (buttons, sticks, and where touches land)") {
             startActivity(Intent(this, ControllerTestActivity::class.java))
         }
-        button("Edit positions / add tap points") {
-            startActivity(Intent(this, CalibrateActivity::class.java))
+
+        label("Modes", 18f).setTypeface(null, Typeface.BOLD)
+        label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode.", 14f)
+        modeText = label("")
+        val modeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((i, name) in Prefs.MODE_NAMES.withIndex()) {
+            modeRow.addView(Button(this).apply {
+                text = name
+                isAllCaps = false
+                setOnClickListener { pickMode(i) }
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        col.addView(modeRow)
+        val editRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((i, name) in Prefs.MODE_NAMES.withIndex()) {
+            editRow.addView(Button(this).apply {
+                text = "Edit $name"
+                isAllCaps = false
+                setOnClickListener {
+                    startActivity(Intent(this@MainActivity, CalibrateActivity::class.java).putExtra("mode", i))
+                }
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        col.addView(editRow)
+        button("Show / hide layout overlay now") {
+            val sv = service
+            if (sv == null) statusText.text = "Start the flicker first."
+            else safe { sv.setOverlay(!(JSONObject(sv.inputState()).optBoolean("overlay"))) }
         }
 
         label("Tuning (press Start again to apply)", 18f).setTypeface(null, Typeface.BOLD)
         slider("Flick length", Prefs.RADIUS, 50, 15, 150) { "%.1f%% of screen width".format(it / 10f) }
         slider("Edge reach (stick pushed sideways)", Prefs.REACH, 18, 0, 40) { "$it% of screen width" }
-        slider("Stick threshold", Prefs.DEAD, 35, 15, 80) { "$it%" }
+        slider("Stick threshold (flick)", Prefs.DEAD, 35, 15, 80) { "$it%" }
+        slider("Joystick size (Park)", Prefs.JOY, 60, 20, 150) { "%.1f%% of screen width".format(it / 10f) }
+        slider("Camera speed (Park)", Prefs.CAM, 10, 2, 40) { "$it" }
         axesBtn = button("") { cycleAxes() }
         updateAxesBtn()
 
@@ -193,9 +223,15 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshShizuku()
-        val l = Prefs.load(this)
-        val groups = l.taps.groupBy { it.code }.entries.joinToString(", ") { "${Prefs.buttonName(it.key)}×${it.value.size}" }
-        layoutText.text = "Tap points: $groups\nFlicks: left stick + right stick"
+        val sb = StringBuilder()
+        for ((i, name) in Prefs.MODE_NAMES.withIndex()) {
+            val l = Prefs.load(this, i)
+            val groups = l.taps.groupBy { it.code }.entries.joinToString(", ") { "${Prefs.buttonName(it.key)}×${it.value.size}" }
+            sb.append("$name: $groups · L stick ${l.ltype}, R stick ${l.rtype}\n")
+        }
+        layoutText.text = sb.toString().trim()
+        updateModeText()
+        if (service != null) startService(Intent(this, OverlayService::class.java).setAction("reload"))
         handler.post(poll)
     }
 
@@ -260,14 +296,31 @@ class MainActivity : Activity() {
     private fun doStart() {
         val s = service ?: return
         statusText.text = safe { s.start(Prefs.buildConfig(this)) } ?: "Engine call failed"
+        if (!android.provider.Settings.canDrawOverlays(this)) safe { s.grantOverlay(packageName) }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 5)
+        safe { startForegroundService(Intent(this, OverlayService::class.java)) }
     }
 
     private fun stop() {
+        safe { stopService(Intent(this, OverlayService::class.java)) }
         safe { service?.stop() }
         safe { Shizuku.unbindUserService(args, conn, true) }
         service = null
         statusText.text = "Engine: stopped"
         monitorText.text = "-"
+    }
+
+    private fun pickMode(i: Int) {
+        Prefs.putInt(this, Prefs.MODE, i)
+        safe { service?.setMode(i) }
+        updateModeText()
+    }
+
+    private fun updateModeText() {
+        val i = Prefs.getInt(this, Prefs.MODE, 0)
+        modeText.text = "Current mode: ${Prefs.MODE_NAMES.getOrElse(i) { "?" }}"
     }
 
     private fun checkUpdate() {
