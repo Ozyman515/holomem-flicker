@@ -32,7 +32,8 @@ jobs:
             echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
             echo "using private keystore"
           else
-            echo "no KEYSTORE_B64 secret: using the old public keystore"
+            echo "::error::KEYSTORE_B64 secret is missing - refusing to build an unsigned release"
+            exit 1
           fi
 
       - name: Build

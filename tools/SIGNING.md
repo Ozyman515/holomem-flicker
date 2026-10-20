@@ -18,4 +18,5 @@ The app also checks the downloaded APK against the signed SHA-256, and only acce
 
 ## APK signing key
 CI signs the APK with the keystore in the `KEYSTORE_B64` / `KEYSTORE_PASS` repository secrets
-(falls back to the old public `app/flicker.jks` until those exist).
+(alias `release`). The owner keeps `release.jks` offline as a backup. The old public `app/flicker.jks`
+was retired at v10 (one-time reinstall).

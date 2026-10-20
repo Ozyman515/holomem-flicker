@@ -19,18 +19,13 @@ android {
 
     signingConfigs {
         create("flick") {
-            // Private keystore from CI secrets when present; the old public one otherwise.
+            // Private keystore, only from CI secrets (KEYSTORE_B64 / KEYSTORE_PASS). Never committed.
             val ks = System.getenv("KEYSTORE_PATH")
             if (ks != null && ks.isNotEmpty()) {
                 storeFile = file(ks)
                 storePassword = System.getenv("KEYSTORE_PASS")
                 keyAlias = System.getenv("KEYSTORE_ALIAS") ?: "release"
                 keyPassword = System.getenv("KEYSTORE_PASS")
-            } else {
-                storeFile = file("flicker.jks")
-                storePassword = "holoflick"
-                keyAlias = "flicker"
-                keyPassword = "holoflick"
             }
         }
     }
