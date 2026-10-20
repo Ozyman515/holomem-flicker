@@ -1,5 +1,6 @@
 package com.ozyman.holomemflicker
 
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -105,6 +106,25 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     }
 
     private val readers = ArrayList<Reader>()
+    private val pressed = HashSet<Int>()
+    @Volatile private var rAx = 2
+    @Volatile private var rAy = 5
+
+    /** Snapshot for the controller test screen. */
+    @Synchronized
+    fun stateJson(): String {
+        val o = JSONObject()
+        o.put("keys", JSONArray(pressed.toList()))
+        val axes = JSONObject()
+        val a = active
+        if (a != null) for (c in a.range.keys) axes.put(c.toString(), a.norm(c).toDouble())
+        o.put("axes", axes)
+        o.put("rx", rAx)
+        o.put("ry", rAy)
+        o.put("device", a?.dev?.name ?: "")
+        o.put("fingers", inj?.count() ?: 0)
+        return o.toString()
+    }
     @Volatile private var active: Reader? = null
 
     private var inj: TouchInjector? = null
@@ -179,6 +199,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             else if (main.abs.containsKey(3) && main.abs.containsKey(4)) 3 to 4
             else 2 to 5
         }
+        rAx = right.first
+        rAy = right.second
         for (o in stickCfg) {
             val isRight = o.optString("side") == "right"
             val (ax, ay) = if (isRight) right else (0 to 1)
@@ -200,6 +222,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         when (type) {
             1 -> { // EV_KEY
                 if (value == 2) return
+                if (value == 1) pressed.add(code) else pressed.remove(code)
                 if (value == 1) {
                     keySeq++
                     lastKey = "$keySeq:$code"

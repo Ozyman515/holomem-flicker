@@ -76,7 +76,7 @@ object DeviceScanner {
     fun candidates(devs: List<DeviceInfo>, forcedPath: String): List<DeviceInfo> {
         if (forcedPath.isNotEmpty()) return devs.filter { it.path == forcedPath }
         return devs.filter {
-            !it.abs.containsKey(0x35) &&
+            !it.abs.containsKey(0x35) && !it.keys.contains(0x140) && !it.keys.contains(0x14a) &&
                 ((it.abs.containsKey(0) && it.abs.containsKey(1)) || it.keys.contains(0x136) || it.keys.contains(0x130))
         }
     }

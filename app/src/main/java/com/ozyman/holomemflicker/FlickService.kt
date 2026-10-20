@@ -78,6 +78,8 @@ class FlickService : IFlickService.Stub() {
         "update failed: $t"
     }
 
+    override fun inputState(): String = engine?.stateJson() ?: "{}"
+
     override fun listDevices(): String = try {
         DeviceScanner.scan().joinToString("\n")
     } catch (t: Throwable) {

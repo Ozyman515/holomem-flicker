@@ -131,6 +131,9 @@ class MainActivity : Activity() {
         statusText = label("Engine: stopped")
 
         layoutText = label("")
+        button("🎮 Controller test (buttons, sticks, and where touches land)") {
+            startActivity(Intent(this, ControllerTestActivity::class.java))
+        }
         button("Edit positions / add tap points") {
             startActivity(Intent(this, CalibrateActivity::class.java))
         }
