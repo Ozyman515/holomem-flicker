@@ -7,7 +7,8 @@ class DeviceInfo(val path: String, val name: String) {
     val abs = HashMap<Int, IntArray>()
 
     override fun toString(): String =
-        "$path  \"$name\"  keys=${keys.size}  abs=${abs.keys.sorted().joinToString(",") { "%02x".format(it) }}"
+        "$path  \"$name\"  keys=${keys.size}  abs=" +
+            abs.keys.sorted().joinToString(" ") { val a = abs[it]!!; "%02x[%d..%d]=%d".format(it, a[1], a[2], a[0]) }
 }
 
 object DeviceScanner {

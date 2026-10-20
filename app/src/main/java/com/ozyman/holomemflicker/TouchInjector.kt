@@ -43,6 +43,10 @@ class TouchInjector {
         }
     }
 
+    @Volatile var sent = 0
+    @Volatile var failed = 0
+    @Volatile var lastError = ""
+
     @Synchronized
     fun count(): Int = active.size
 
@@ -112,7 +116,15 @@ class TouchInjector {
             0, 0, 1f, 1f, deviceId, 0, InputDevice.SOURCE_TOUCHSCREEN, 0
         )
         try {
-            inject.invoke(target, ev, 0)
+            val ok = inject.invoke(target, ev, 0)
+            sent++
+            if (ok == false) {
+                failed++
+                lastError = "system refused the touch"
+            }
+        } catch (t: Throwable) {
+            failed++
+            lastError = (t.cause ?: t).toString()
         } finally {
             ev.recycle()
         }

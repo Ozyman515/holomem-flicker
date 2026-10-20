@@ -129,6 +129,33 @@ class MainActivity : Activity() {
 
         label("Live input", 18f).setTypeface(null, Typeface.BOLD)
         monitorText = label("-", 13f).apply { typeface = Typeface.MONOSPACE }
+        lateinit var target: TextView
+        button("Test touch (taps the box below by itself)") {
+            val s = service
+            if (s == null) {
+                target.text = "Start the flicker first."
+            } else {
+                target.text = "Sending a touch…"
+                val loc = IntArray(2)
+                target.getLocationOnScreen(loc)
+                val x = loc[0] + target.width / 2f
+                val y = loc[1] + target.height / 2f
+                Thread {
+                    Thread.sleep(300)
+                    val r = safe { s.testTouch(x, y) } ?: "engine call failed"
+                    Thread.sleep(400)
+                    runOnUiThread { if (!target.text.startsWith("✓")) target.text = "No touch arrived ($r)" }
+                }.start()
+            }
+        }
+        target = label("[ touch test box ]", 18f).apply {
+            setBackgroundColor(0xFF2E3A66.toInt())
+            setPadding(30, 40, 30, 40)
+            setOnTouchListener { _, e ->
+                if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) text = "✓ Touch received! Injection works."
+                true
+            }
+        }
         button("List input devices") {
             val s = service
             monitorText.text = if (s == null) "Start the flicker first." else (safe { s.listDevices() } ?: "error")

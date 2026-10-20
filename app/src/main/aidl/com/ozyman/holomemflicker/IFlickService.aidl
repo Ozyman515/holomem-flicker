@@ -9,4 +9,5 @@ interface IFlickService {
     String monitor() = 4;
     String lastKey() = 5;
     String listDevices() = 6;
+    String testTouch(float x, float y) = 7;
 }

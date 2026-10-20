@@ -45,6 +45,16 @@ class FlickService : IFlickService.Stub() {
 
     override fun lastKey(): String = engine?.lastKey ?: ""
 
+    override fun testTouch(x: Float, y: Float): String = try {
+        val t = TouchInjector()
+        val id = t.down(x, y)
+        Thread.sleep(60)
+        t.up(id)
+        if (t.failed > 0) "touch failed: ${t.lastError}" else "touch sent"
+    } catch (e: Throwable) {
+        "touch error: ${e.cause ?: e}"
+    }
+
     override fun listDevices(): String = try {
         DeviceScanner.scan().joinToString("\n")
     } catch (t: Throwable) {

@@ -38,6 +38,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     @Volatile var lastKey = ""
         private set
     private var keySeq = 0
+    @Volatile private var nEvents = 0
+    @Volatile private var nKeys = 0
 
     private val forcedPath = cfg.optString("devicePath", "")
     private val rightAxes = cfg.optString("rightAxes", "auto")
@@ -94,7 +96,12 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         for (s in sticks) {
             sb.append("%s  x=%+.2f y=%+.2f %s\n".format(s.name, norm(s.ax), norm(s.ay), if (s.pid >= 0) "FLICK" else ""))
         }
-        sb.append("fingers down: ").append(inj?.count() ?: 0).append('\n')
+        val i = inj
+        sb.append("controller events read: $nEvents (buttons: $nKeys)\n")
+        sb.append("fingers down: ").append(i?.count() ?: 0)
+            .append("   touches sent: ").append(i?.sent ?: 0)
+            .append("   failed: ").append(i?.failed ?: 0).append('\n')
+        if (i != null && i.lastError.isNotEmpty()) sb.append("last touch error: ").append(i.lastError).append('\n')
         synchronized(recent) { for (r in recent) sb.append(r).append('\n') }
         return sb.toString()
     }
@@ -157,6 +164,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     }
 
     private fun handle(injector: TouchInjector, type: Int, code: Int, value: Int) {
+        nEvents++
+        if (type == 1) nKeys++
         when (type) {
             1 -> { // EV_KEY
                 if (value == 2) return
