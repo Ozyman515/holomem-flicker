@@ -23,19 +23,40 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Private keystore (from secrets, if set)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "using private keystore"
+          else
+            echo "no KEYSTORE_B64 secret: using the old public keystore"
+          fi
+
       - name: Build
+        env:
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
         run: |
           set -o pipefail
           gradle --no-daemon --stacktrace assembleRelease 2>&1 | tee build.log
-          cp app/build/outputs/apk/release/app-release.apk holomem-flicker-v${{ github.run_number }}.apk
+          N=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk holomem-flicker-v$N.apk
+          SHA=$(sha256sum holomem-flicker-v$N.apk | cut -d' ' -f1)
+          SIZE=$(stat -c %s holomem-flicker-v$N.apk)
+          printf '{\n  "version": %s,\n  "apk": "https://github.com/Ozyman515/holomem-flicker/releases/download/v%s/holomem-flicker-v%s.apk",\n  "sha256": "%s",\n  "size": %s\n}\n' "$N" "$N" "$N" "$SHA" "$SIZE" > release.json
+          cat release.json
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Holomem Flicker v${{ github.run_number }}
-          body: "Install the APK below on the tablet. Commit: ${{ github.sha }}"
-          files: holomem-flicker-v${{ github.run_number }}.apk
+          body: "Not offered to the app until release.json is signed with the offline key (see tools/SIGNING.md). Commit: ${{ github.sha }}"
+          files: |
+            holomem-flicker-v${{ github.run_number }}.apk
+            release.json
 
       - name: Save build log to ci-log branch
         if: always()

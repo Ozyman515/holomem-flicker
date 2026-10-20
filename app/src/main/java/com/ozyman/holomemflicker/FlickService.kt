@@ -55,27 +55,46 @@ class FlickService : IFlickService.Stub() {
         "touch error: ${e.cause ?: e}"
     }
 
-    /** Download the APK as the shell user and install it with pm (no installer prompt). */
-    override fun installUpdate(url: String?): String = try {
+    /** Unsigned installs are switched off: only [installVerified] installs anything. */
+    override fun installUpdate(url: String?): String =
+        "refused: this version only installs signed updates"
+
+    /**
+     * Download the APK as the shell user, check it against the SHA-256 from the SIGNED
+     * manifest (the app verified the signature first), and only then install it with pm.
+     */
+    override fun installVerified(url: String?, sha256: String?): String = try {
+        val u = url ?: ""
+        val want = (sha256 ?: "").lowercase()
+        if (!u.startsWith("https://github.com/Ozyman515/holomem-flicker/releases/download/")) throw RuntimeException("unexpected download address")
+        if (!Regex("^[0-9a-f]{64}$").matches(want)) throw RuntimeException("bad fingerprint")
         val dest = java.io.File("/data/local/tmp/holomem-flicker-update.apk")
-        var conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        dest.delete()
+        var conn = java.net.URL(u).openConnection() as java.net.HttpURLConnection
         var hops = 0
         while (conn.responseCode in 300..399 && hops < 5) {
             val next = conn.getHeaderField("Location")
             conn.disconnect()
-            conn = java.net.URL(java.net.URL(url), next).openConnection() as java.net.HttpURLConnection
+            val nu = java.net.URL(java.net.URL(u), next)
+            if (nu.protocol != "https") throw RuntimeException("insecure redirect")
+            conn = nu.openConnection() as java.net.HttpURLConnection
             hops++
         }
         if (conn.responseCode != 200) throw RuntimeException("download HTTP ${conn.responseCode}")
         conn.inputStream.use { inp -> dest.outputStream().use { out -> inp.copyTo(out) } }
         conn.disconnect()
+        val got = UpdateVerifier.sha256Hex(dest)
+        if (got != want) {
+            dest.delete()
+            throw RuntimeException("the download doesn't match the signed fingerprint - not installing")
+        }
         val p = ProcessBuilder("pm", "install", "-r", dest.absolutePath).redirectErrorStream(true).start()
         val out = p.inputStream.bufferedReader().readText().trim()
         p.waitFor()
         dest.delete()
         out
     } catch (t: Throwable) {
-        "update failed: $t"
+        "update failed: ${t.message ?: t}"
     }
 
     override fun inputState(): String = engine?.stateJson() ?: "{}"

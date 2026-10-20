@@ -40,6 +40,37 @@ class MainActivity : Activity() {
     private lateinit var axesBtn: Button
     private lateinit var modeText: TextView
     private lateinit var killText: TextView
+    private lateinit var backupText: TextView
+
+    companion object {
+        private const val REQ_EXPORT = 41
+        private const val REQ_IMPORT = 42
+    }
+
+    @Deprecated("plain Activity API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) return
+        backupText.text = try {
+            when (requestCode) {
+                REQ_EXPORT -> {
+                    contentResolver.openOutputStream(uri, "wt")!!.use { it.write(Prefs.exportAll(this).toByteArray()) }
+                    "Backup saved ✓"
+                }
+                REQ_IMPORT -> {
+                    val txt = contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                    val n = Prefs.importAll(this, txt)
+                    recreate()
+                    "Restored $n settings ✓ (press Start again to apply)"
+                }
+                else -> return
+            }
+        } catch (t: Throwable) {
+            "Backup error: ${t.message ?: t}"
+        }
+    }
 
     private val args by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, FlickService::class.java.name))
@@ -136,6 +167,24 @@ class MainActivity : Activity() {
         layoutText = label("")
         button("🎮 Controller test (buttons, sticks, and where touches land)") {
             startActivity(Intent(this, ControllerTestActivity::class.java))
+        }
+
+        label("Backup", 18f).setTypeface(null, Typeface.BOLD)
+        backupText = label("Save all your layouts and settings to a file, or load them back.", 14f)
+        button("Back up layouts & settings to a file") {
+            @Suppress("DEPRECATION")
+            startActivityForResult(
+                Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/json").putExtra(Intent.EXTRA_TITLE, "holomem-flicker-backup.json"),
+                REQ_EXPORT
+            )
+        }
+        button("Restore layouts & settings from a file") {
+            @Suppress("DEPRECATION")
+            startActivityForResult(
+                Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),
+                REQ_IMPORT
+            )
         }
 
         label("Lenovo mapper", 18f).setTypeface(null, Typeface.BOLD)
@@ -362,42 +411,50 @@ class MainActivity : Activity() {
         modeText.text = "Current mode: ${Prefs.MODE_NAMES.getOrElse(i) { "?" }}"
     }
 
+    private var updateSha: String? = null
+
+    /** Signed-update check: manifest + signature from the repo, verified against the built-in public key. */
     private fun checkUpdate() {
-        updateText.text = "Version v${BuildConfig.VERSION_CODE} — checking for updates…"
+        updateText.text = "Version v${BuildConfig.VERSION_CODE} — checking for signed updates…"
         Thread {
-            val result: Pair<Int, String?>? = try {
-                val c = URL("https://api.github.com/repos/Ozyman515/holomem-flicker/releases/latest")
-                    .openConnection() as HttpURLConnection
-                c.setRequestProperty("Accept", "application/vnd.github+json")
+            fun get(u: String): ByteArray? = try {
+                val c = URL(u + "?t=" + System.currentTimeMillis()).openConnection() as HttpURLConnection
                 c.connectTimeout = 10000
                 c.readTimeout = 10000
-                val o = JSONObject(c.inputStream.bufferedReader().readText())
+                val ok = c.responseCode == 200
+                val b = if (ok) c.inputStream.readBytes() else null
                 c.disconnect()
-                val tag = o.optString("tag_name").removePrefix("v").toIntOrNull() ?: 0
-                val assets = o.optJSONArray("assets")
-                var url: String? = null
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val a = assets.getJSONObject(i)
-                    if (a.optString("name").endsWith(".apk")) url = a.optString("browser_download_url")
-                }
-                tag to url
-            } catch (t: Throwable) {
+                b
+            } catch (_: Throwable) {
                 null
             }
+            val manifest = get(UpdateVerifier.MANIFEST_URL)
+            val sig = get(UpdateVerifier.SIG_URL)
+            val msg: String
+            var rel: UpdateVerifier.Release? = null
+            val mine = BuildConfig.VERSION_CODE
+            if (manifest == null) {
+                msg = "Version v$mine — no signed release published yet."
+            } else if (sig == null || !UpdateVerifier.signatureOk(manifest, String(sig))) {
+                msg = "Version v$mine — the latest release is NOT signed by your key. Not offering it."
+            } else {
+                rel = UpdateVerifier.parse(manifest)
+                msg = when {
+                    rel == null -> "Version v$mine — signed release has an unexpected format. Not offering it."
+                    rel.version > mine -> "Version v$mine — signed update v${rel.version} is available ✓"
+                    else -> "Version v$mine — up to date ✓ (signed)"
+                }
+            }
             runOnUiThread {
-                val mine = BuildConfig.VERSION_CODE
-                when {
-                    result == null -> updateText.text = "Version v$mine — couldn't reach GitHub."
-                    result.first > mine && result.second != null -> {
-                        updateUrl = result.second
-                        updateText.text = "Version v$mine — update v${result.first} is available!"
-                        updateBtn.text = "Install update v${result.first}"
-                        updateBtn.visibility = View.VISIBLE
-                    }
-                    else -> {
-                        updateText.text = "Version v$mine — up to date ✓"
-                        updateBtn.visibility = View.GONE
-                    }
+                updateText.text = msg
+                val r = rel
+                if (r != null && r.version > mine) {
+                    updateUrl = r.apkUrl
+                    updateSha = r.sha256
+                    updateBtn.text = "Install signed update v${r.version}"
+                    updateBtn.visibility = View.VISIBLE
+                } else {
+                    updateBtn.visibility = View.GONE
                 }
             }
         }.start()
@@ -424,10 +481,11 @@ class MainActivity : Activity() {
     private fun doInstall() {
         val s = service ?: return
         val url = updateUrl ?: return
-        updateText.text = "Downloading and installing… the app will close when it's done. Reopen it after."
+        val sha = updateSha ?: return
+        updateText.text = "Downloading, checking the signature fingerprint, installing… the app will close when it's done. Reopen it after."
         updateBtn.isEnabled = false
         Thread {
-            val r = safe { s.installUpdate(url) } ?: "install call failed"
+            val r = safe { s.installVerified(url, sha) } ?: "install call failed"
             runOnUiThread {
                 updateBtn.isEnabled = true
                 updateText.text = "Update result: $r"

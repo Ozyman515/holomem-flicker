@@ -18,4 +18,5 @@ interface IFlickService {
     void setEditing(boolean on) = 13;
     String findPackages() = 14;
     String forceStop(String pkg) = 15;
+    String installVerified(String url, String sha256) = 16;
 }

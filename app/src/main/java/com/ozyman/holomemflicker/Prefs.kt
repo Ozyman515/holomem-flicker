@@ -154,6 +154,41 @@ object Prefs {
     const val MODE = "mode"          // starting mode index
     const val KILL_PKG = "killPkg"   // mapper app to force-stop on Start ("" = off)
 
+    /** Everything the app has saved (layouts, sliders, choices) as one JSON backup. */
+    fun exportAll(ctx: Context): String {
+        val o = JSONObject().put("app", "holomem-flicker").put("backupVersion", 1)
+        val data = JSONObject()
+        for ((k, v) in ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).all) {
+            when (v) {
+                is Int -> data.put(k, JSONObject().put("t", "i").put("v", v))
+                is String -> data.put(k, JSONObject().put("t", "s").put("v", v))
+                is Boolean -> data.put(k, JSONObject().put("t", "b").put("v", v))
+            }
+        }
+        return o.put("prefs", data).toString(2)
+    }
+
+    /** Restore a backup made by [exportAll]. Returns how many settings were restored. */
+    fun importAll(ctx: Context, json: String): Int {
+        val o = JSONObject(json)
+        require(o.optString("app") == "holomem-flicker") { "not a Holomem Flicker backup" }
+        val data = o.getJSONObject("prefs")
+        val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+        var n = 0
+        for (k in data.keys()) {
+            val e = data.getJSONObject(k)
+            when (e.optString("t")) {
+                "i" -> ed.putInt(k, e.getInt("v"))
+                "s" -> ed.putString(k, e.getString("v"))
+                "b" -> ed.putBoolean(k, e.getBoolean("v"))
+                else -> continue
+            }
+            n++
+        }
+        ed.apply()
+        return n
+    }
+
     fun screenSize(ctx: Context): Pair<Int, Int> {
         val wm = ctx.getSystemService(WindowManager::class.java)
         val b = wm.maximumWindowMetrics.bounds
