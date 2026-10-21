@@ -325,11 +325,15 @@ class ControllerTestActivity : Activity() {
             c.drawPath(path, line)
             txt.textSize = rect.height() * 0.36f
             txt.color = Raden.CREAM
+            txt.setShadowLayer(8f, 0f, 0f, Raden.NIGHT)
             c.drawText(label, rect.centerX(), rect.centerY() + txt.textSize * 0.1f, txt)
+            txt.clearShadowLayer()
             small.textAlign = Paint.Align.CENTER
             small.textSize = rect.height() * 0.2f
-            small.color = Raden.PLATINUM
+            small.color = Raden.CREAM
+            small.setShadowLayer(6f, 0f, 0f, Raden.NIGHT)
             c.drawText("%d%%".format((a * 100).toInt()), rect.centerX(), rect.centerY() + txt.textSize * 0.95f, small)
+            small.clearShadowLayer()
             small.textAlign = Paint.Align.LEFT
         }
 
@@ -349,7 +353,7 @@ class ControllerTestActivity : Activity() {
         private val dash = DashPathEffect(floatArrayOf(14f, 10f), 0f)
 
         /** An extra Kishi button (L4/R4/M1/M2/Share/Nexus): lights up with whatever code it was taught. */
-        private fun extra(c: Canvas, label: String, rect: RectF, rear: Boolean = false) {
+        private fun extra(c: Canvas, label: String, rect: RectF, rear: Boolean = false, caption: Boolean = true) {
             extraRects[label] = rect
             val code = Prefs.extraCode(context, label)
             val col = if (code >= 0) stateColor(ek(code), ak(code)) else null
@@ -379,7 +383,7 @@ class ControllerTestActivity : Activity() {
                 code >= 0 -> "= " + if (code in 0x130..0x13e) Prefs.buttonName(code) else "0x%03x".format(code)
                 else -> "tap to test"
             }
-            if (!rear) c.drawText(sub, rect.centerX(), rect.bottom + small.textSize * 1.25f, small)
+            if (!rear && caption) c.drawText(sub, rect.centerX(), rect.bottom + small.textSize * 1.25f, small)
             small.textAlign = Paint.Align.LEFT
         }
 
@@ -458,10 +462,10 @@ class ControllerTestActivity : Activity() {
             val rt = eTrig(true).coerceAtLeast(aa("rt"))
             trigger(c, "L2", RectF(lx(0.08f), h * 0.015f, lx(0.56f), h * 0.125f), 0x138, lt, true)
             bumper(c, "L1", RectF(lx(0.05f), h * 0.135f, lx(0.72f), h * 0.195f), 0x136)
-            extra(c, "L4", RectF(lx(0.62f), h * 0.055f, lx(0.84f), h * 0.12f))
+            extra(c, "L4", RectF(lx(0.62f), h * 0.055f, lx(0.84f), h * 0.12f), caption = false)
             trigger(c, "R2", RectF(rx(0.56f), h * 0.015f, rx(0.08f), h * 0.125f), 0x139, rt, false)
             bumper(c, "R1", RectF(rx(0.72f), h * 0.135f, rx(0.05f), h * 0.195f), 0x137)
-            extra(c, "R4", RectF(rx(0.84f), h * 0.055f, rx(0.62f), h * 0.12f))
+            extra(c, "R4", RectF(rx(0.84f), h * 0.055f, rx(0.62f), h * 0.12f), caption = false)
 
             // round back buttons (on the rear of the grips, drawn dashed)
             val mr = gw * 0.085f
@@ -478,11 +482,11 @@ class ControllerTestActivity : Activity() {
 
             // right face (from photo): Menu top-inner, ABXY top, LED, stick below, Nexus bottom-inner
             val bx = rx(0.42f)
-            val by = gy(0.17f)
+            val by = gy(0.20f)
             val bs = gw * 0.18f
             val br = gw * 0.085f
-            button(c, "Y", bx, by - bs * 0.55f, br, 0x134)
-            button(c, "A", bx, by + bs * 0.55f, br, 0x130)
+            button(c, "Y", bx, by - bs, br, 0x134)
+            button(c, "A", bx, by + bs, br, 0x130)
             button(c, "X", bx - bs, by, br, 0x133)
             button(c, "B", bx + bs, by, br, 0x131)
             button(c, "☰", rx(0.80f), gy(0.07f), sr, 0x13b) // menu / start
