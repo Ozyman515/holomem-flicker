@@ -302,6 +302,49 @@ class ControllerTestActivity : Activity() {
             return path
         }
 
+        /** Top-down trigger (L2/R2): rounded hump that fills from the bottom up as it's squeezed. */
+        private fun trigger(c: Canvas, label: String, rect: RectF, code: Int, analog: Float, outerLeft: Boolean) {
+            val a = analog.coerceIn(0f, 1f)
+            val digital = stateColor(ek(code), ak(code))
+            val big = rect.width() * 0.55f
+            val sm = rect.height() * 0.18f
+            // big rounded corner on the outer top, like the real trigger
+            val radii = if (outerLeft) floatArrayOf(big, big, sm * 3, sm * 3, sm, sm, sm, sm)
+                        else floatArrayOf(sm * 3, sm * 3, big, big, sm, sm, sm, sm)
+            val path = android.graphics.Path().apply { addRoundRect(rect, radii, android.graphics.Path.Direction.CW) }
+            fill.color = Raden.TEAL
+            c.drawPath(path, fill)
+            val level = if (a > 0.02f) a else if (digital != null) 1f else 0f
+            if (level > 0f) {
+                c.save()
+                c.clipRect(rect.left, rect.bottom - rect.height() * level, rect.right, rect.bottom)
+                fill.color = if (engineOk && a > 0.02f) cyan else digital ?: cyan
+                c.drawPath(path, fill)
+                c.restore()
+            }
+            c.drawPath(path, line)
+            txt.textSize = rect.height() * 0.36f
+            txt.color = Raden.CREAM
+            c.drawText(label, rect.centerX(), rect.centerY() + txt.textSize * 0.1f, txt)
+            small.textAlign = Paint.Align.CENTER
+            small.textSize = rect.height() * 0.2f
+            small.color = Raden.PLATINUM
+            c.drawText("%d%%".format((a * 100).toInt()), rect.centerX(), rect.centerY() + txt.textSize * 0.95f, small)
+            small.textAlign = Paint.Align.LEFT
+        }
+
+        /** Top-down bumper (L1/R1): long bar in front of the trigger. */
+        private fun bumper(c: Canvas, label: String, rect: RectF, code: Int) {
+            val col = stateColor(ek(code), ak(code))
+            val r = rect.height() * 0.35f
+            fill.color = col ?: Raden.TEAL
+            c.drawRoundRect(rect, r, r, fill)
+            c.drawRoundRect(rect, r, r, line)
+            txt.textSize = rect.height() * 0.55f
+            txt.color = if (col != null) Raden.INK else Raden.CREAM
+            c.drawText(label, rect.centerX(), rect.centerY() + txt.textSize * 0.35f, txt)
+        }
+
         val extraRects = LinkedHashMap<String, RectF>()
         private val dash = DashPathEffect(floatArrayOf(14f, 10f), 0f)
 
@@ -375,6 +418,9 @@ class ControllerTestActivity : Activity() {
                 Triple(-1f, 0f, hx < -0.5f || ek(0x222) || ak(0x222)),
                 Triple(1f, 0f, hx > 0.5f || ek(0x223) || ak(0x223))
             )
+            fill.color = Raden.TEAL_DEEP // round floating d-pad base
+            c.drawCircle(x, y, s * 1.75f, fill)
+            c.drawCircle(x, y, s * 1.75f, line)
             for ((dx, dy, on) in dirs) {
                 val cx = x + dx * s
                 val cy = y + dy * s
@@ -401,44 +447,49 @@ class ControllerTestActivity : Activity() {
                 c.drawPath(path, body)
                 c.drawPath(path, line)
             }
-            val tab = RectF(w * 0.30f, h * 0.18f, w * 0.70f, h * 0.95f)
+            val tab = RectF(w * 0.30f, h * 0.20f, w * 0.70f, h * 0.95f)
             fill.color = 0xFF081815.toInt()
             c.drawRoundRect(tab, 18f, 18f, fill)
             c.drawRoundRect(tab, 18f, 18f, line)
 
-            // shoulders: trigger behind, bumper on the top edge, L4/R4 claw-grip button next to the tablet
-            pill(c, "L2", RectF(lx(0.12f), h * 0.03f, lx(0.58f), h * 0.10f), 0x138, eTrig(false).coerceAtLeast(aa("lt")))
-            pill(c, "L1", RectF(lx(0.12f), h * 0.12f, lx(0.58f), h * 0.19f), 0x136)
-            extra(c, "L4", RectF(lx(0.64f), h * 0.125f, lx(0.94f), h * 0.185f))
-            pill(c, "R2", RectF(rx(0.58f), h * 0.03f, rx(0.12f), h * 0.10f), 0x139, eTrig(true).coerceAtLeast(aa("rt")))
-            pill(c, "R1", RectF(rx(0.58f), h * 0.12f, rx(0.12f), h * 0.19f), 0x137)
-            extra(c, "R4", RectF(rx(0.94f), h * 0.125f, rx(0.64f), h * 0.185f))
-            // rear paddles (on the back of the handles, drawn dashed)
-            extra(c, "M1", RectF(w * 0.004f, gy(0.48f), w * 0.034f, gy(0.80f)), rear = true)
-            extra(c, "M2", RectF(w * 0.966f, gy(0.48f), w * 0.996f, gy(0.80f)), rear = true)
+            // shoulders, top-down (from photos): big trigger at the outer side, long bumper in front,
+            // small square L4/R4 next to the tablet
+            val lt = eTrig(false).coerceAtLeast(aa("lt"))
+            val rt = eTrig(true).coerceAtLeast(aa("rt"))
+            trigger(c, "L2", RectF(lx(0.08f), h * 0.015f, lx(0.56f), h * 0.125f), 0x138, lt, true)
+            bumper(c, "L1", RectF(lx(0.05f), h * 0.135f, lx(0.72f), h * 0.195f), 0x136)
+            extra(c, "L4", RectF(lx(0.62f), h * 0.055f, lx(0.84f), h * 0.12f))
+            trigger(c, "R2", RectF(rx(0.56f), h * 0.015f, rx(0.08f), h * 0.125f), 0x139, rt, false)
+            bumper(c, "R1", RectF(rx(0.72f), h * 0.135f, rx(0.05f), h * 0.195f), 0x137)
+            extra(c, "R4", RectF(rx(0.84f), h * 0.055f, rx(0.62f), h * 0.12f))
 
-            val sr = gw * 0.055f
-            // left face: stick up top, d-pad below toward the tablet, View top, Share bottom
-            stick(c, "", lx(0.47f), gy(0.30f), gw * 0.19f, ea(0), ea(1), aa("lx"), aa("ly"), 0x13d)
-            dpad(c, lx(0.66f), gy(0.56f), gw * 0.105f)
-            button(c, "⧉", lx(0.86f), gy(0.10f), sr, 0x13a) // view / select
-            extra(c, "Share", RectF(lx(0.86f) - sr * 1.7f, gy(0.74f) - sr, lx(0.86f) + sr * 1.7f, gy(0.74f) + sr))
+            // round back buttons (on the rear of the grips, drawn dashed)
+            val mr = gw * 0.085f
+            extra(c, "M1", RectF(lx(0.20f) - mr, gy(0.66f) - mr, lx(0.20f) + mr, gy(0.66f) + mr), rear = true)
+            extra(c, "M2", RectF(rx(0.20f) - mr, gy(0.66f) - mr, rx(0.20f) + mr, gy(0.66f) + mr), rear = true)
 
-            // right face: ABXY up top, stick below toward the tablet, Menu top, Nexus middle, Home bottom
-            val bx = rx(0.50f)
-            val by = gy(0.28f)
-            val bs = gw * 0.15f
-            val br = gw * 0.075f
-            button(c, "Y", bx, by - bs, br, 0x134)
-            button(c, "A", bx, by + bs, br, 0x130)
+            val sr = gw * 0.05f
+            // left face (from photo): stick top, Home top-inner, "…" (View) middle, round d-pad, Capture bottom
+            stick(c, "", lx(0.48f), gy(0.23f), gw * 0.2f, ea(0), ea(1), aa("lx"), aa("ly"), 0x13d)
+            button(c, "⌂", lx(0.86f), gy(0.10f), sr, 0x13c) // home
+            button(c, "…", lx(0.86f), gy(0.34f), sr, 0x13a) // view / select
+            dpad(c, lx(0.62f), gy(0.56f), gw * 0.095f)
+            extra(c, "Share", RectF(lx(0.84f) - sr * 1.7f, gy(0.83f) - sr, lx(0.84f) + sr * 1.7f, gy(0.83f) + sr))
+
+            // right face (from photo): Menu top-inner, ABXY top, LED, stick below, Nexus bottom-inner
+            val bx = rx(0.42f)
+            val by = gy(0.17f)
+            val bs = gw * 0.18f
+            val br = gw * 0.085f
+            button(c, "Y", bx, by - bs * 0.55f, br, 0x134)
+            button(c, "A", bx, by + bs * 0.55f, br, 0x130)
             button(c, "X", bx - bs, by, br, 0x133)
             button(c, "B", bx + bs, by, br, 0x131)
-            button(c, "☰", rx(0.86f), gy(0.10f), sr, 0x13b) // menu / start
-            extra(c, "Nexus", RectF(rx(0.86f) - sr * 1.7f, gy(0.40f) - sr, rx(0.86f) + sr * 1.7f, gy(0.40f) + sr))
-            button(c, "⌂", rx(0.86f), gy(0.74f), sr, 0x13c) // home
-            stick(c, "", rx(0.62f), gy(0.60f), gw * 0.19f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
+            button(c, "☰", rx(0.80f), gy(0.07f), sr, 0x13b) // menu / start
             fill.color = Raden.SEA_GLASS // status LED
-            c.drawCircle(rx(0.30f), gy(0.45f), gw * 0.012f, fill)
+            c.drawCircle(rx(0.20f), gy(0.36f), gw * 0.012f, fill)
+            stick(c, "", rx(0.58f), gy(0.50f), gw * 0.2f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
+            extra(c, "Nexus", RectF(rx(0.82f) - sr * 1.7f, gy(0.72f) - sr, rx(0.82f) + sr * 1.7f, gy(0.72f) + sr))
 
             // middle "screen": status + injected touches
             small.textSize = h * 0.021f

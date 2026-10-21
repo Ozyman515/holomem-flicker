@@ -70,6 +70,15 @@ class ScreensTest {
         Prefs.setExtraCode(RuntimeEnvironment.getApplication(), "L4", 0x13d)
         Prefs.setExtraCode(RuntimeEnvironment.getApplication(), "R4", 0x13e)
         val a = Robolectric.buildActivity(ControllerTestActivity::class.java).setup().get()
+        // demo: L2 squeezed 60 %, R2 25 %
+        val props = arrayOf(android.view.MotionEvent.PointerProperties().apply { id = 0 })
+        val coords = arrayOf(android.view.MotionEvent.PointerCoords().apply {
+            setAxisValue(android.view.MotionEvent.AXIS_LTRIGGER, 0.6f)
+            setAxisValue(android.view.MotionEvent.AXIS_RTRIGGER, 0.25f)
+        })
+        val ev = android.view.MotionEvent.obtain(0, 0, android.view.MotionEvent.ACTION_MOVE, 1, props, coords,
+            0, 0, 1f, 1f, 0, 0, android.view.InputDevice.SOURCE_JOYSTICK, 0)
+        a.onGenericMotionEvent(ev)
         save(content(a), "5-controller-test", 2560, 1600)
     }
 }
