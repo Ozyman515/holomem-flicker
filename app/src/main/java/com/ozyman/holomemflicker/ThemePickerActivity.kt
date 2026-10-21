@@ -161,11 +161,14 @@ class ThemePickerActivity : Activity() {
                 p.color = Color.WHITE
                 c.drawCircle(cx, cy, r * 1.08f, p)
             }
-            // body: radial gradient soft -> primary -> deep
-            p.shader = RadialGradient(cx - r * 0.25f, cy - r * 0.3f, r * 1.45f,
-                intArrayOf(Raden.mix(t.soft, Color.WHITE, 0.25f), t.soft, t.primary, Raden.mix(t.primary, t.deep, 0.5f)),
-                floatArrayOf(0f, 0.35f, 0.75f, 1f), Shader.TileMode.CLAMP)
+            // body: solid primary, a lighter inner glow up-left, and a slightly darker lower edge
+            p.shader = null
+            p.color = Raden.mix(t.primary, t.deep, 0.35f)
             c.drawCircle(cx, cy, r, p)
+            p.color = t.primary
+            c.drawCircle(cx - r * 0.04f, cy - r * 0.05f, r * 0.9f, p)
+            p.color = Raden.alpha(Raden.mix(t.soft, Color.WHITE, 0.2f), 0xB0)
+            c.drawCircle(cx - r * 0.18f, cy - r * 0.2f, r * 0.55f, p)
             // accent "skittle" swirl across the lower half
             p.shader = null
             p.color = Raden.alpha(t.accent, 0xE6)
