@@ -10,7 +10,7 @@
     <application
         android:label="Holomem Flicker"
         android:icon="@android:drawable/ic_media_ff"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
             android:name=".MainActivity"

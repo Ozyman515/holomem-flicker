@@ -1,0 +1,42 @@
+name: Screenshots
+
+on:
+  push:
+    branches: ["screens/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  screens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Render screens
+        run: |
+          set -o pipefail
+          gradle --no-daemon testDebugUnitTest --tests '*ScreensTest*' 2>&1 | tee test.log
+      - name: Publish to screens-out branch
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp -r screens/* /tmp/out/ 2>/dev/null || true
+          cp test.log /tmp/out/test.log 2>/dev/null || true
+          find app/build/test-results -name '*.xml' -exec cp {} /tmp/out/ \; 2>/dev/null || true
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git switch --orphan screens-out-tmp
+          git rm -rq --cached . 2>/dev/null || true
+          rm -rf ./* .github 2>/dev/null || true
+          cp -r /tmp/out/* .
+          echo "run ${{ github.run_number }} ${{ job.status }} from ${{ github.sha }}" > status.txt
+          git add -A
+          git commit -q -m "screens run ${{ github.run_number }}"
+          git push -f origin HEAD:screens-out

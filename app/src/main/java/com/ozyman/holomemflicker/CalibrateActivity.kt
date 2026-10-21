@@ -67,10 +67,10 @@ class CalibrateActivity : Activity() {
         fun btn(label: String, onClick: () -> Unit) {
             bar.addView(Button(this).apply {
                 text = label
-                isAllCaps = false
-                alpha = 0.85f
+                Raden.pill(this, if (label == "Save") Raden.ORANGE else if (label == "Cancel") Raden.CRIMSON else Raden.TEAL)
+                alpha = 0.92f
                 setOnClickListener { onClick() }
-            })
+            }, LinearLayout.LayoutParams(-2, -2).apply { setMargins(6, 10, 6, 6) })
         }
         btn("Background") { pickBackground() }
         btn("Add point") {
@@ -128,9 +128,9 @@ class CalibrateActivity : Activity() {
         btn("Cancel") { finish() }
         col.addView(bar)
         banner = TextView(this).apply {
-            setTextColor(Color.WHITE)
-            setBackgroundColor(0x99000000.toInt())
-            setPadding(24, 8, 24, 8)
+            setTextColor(Raden.CREAM)
+            background = Raden.rounded(Raden.alpha(Raden.TEAL_DEEP, 0xE6), 22f, Raden.ORANGE, 3)
+            setPadding(28, 12, 28, 12)
             text = "Editing ${Prefs.MODE_NAMES.getOrElse(modeIdx) { "?" }} mode. Drag markers; tap one to select it. Several points can share one button."
         }
         col.addView(banner)
@@ -251,8 +251,8 @@ class CalibrateActivity : Activity() {
                 c.drawBitmap(b, null, Rect(0, 0, width, height), null)
                 c.drawColor(0x44000000)
             } else {
-                c.drawColor(0xFF15182A.toInt())
-                fill.color = 0x55FFFFFF
+                c.drawColor(Raden.NIGHT)
+                fill.color = Raden.alpha(Raden.PLATINUM, 0x66)
                 c.drawRect(0f, height * 0.77f, width.toFloat(), height * 0.78f, fill)
             }
             painter.draw(c, width.toFloat(), height.toFloat(), data, selected)

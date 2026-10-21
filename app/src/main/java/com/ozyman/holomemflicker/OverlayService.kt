@@ -225,9 +225,9 @@ class OverlayService : Service() {
             val bar = android.widget.LinearLayout(ctx).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
             fun btn(label: String, f: () -> Unit) = bar.addView(android.widget.Button(ctx).apply {
                 text = label
-                isAllCaps = false
+                Raden.pill(this, if (label == "Save") Raden.ORANGE else if (label == "Exit") Raden.CRIMSON else Raden.TEAL)
                 setOnClickListener { f() }
-            })
+            }, android.widget.LinearLayout.LayoutParams(-2, -2).apply { setMargins(6, 10, 6, 6) })
             btn("Size −") { resize(-1) }
             btn("Size +") { resize(+1) }
             btn("Delete") { delete() }
@@ -243,9 +243,9 @@ class OverlayService : Service() {
             btn("Save") { saveAndClose(true) }
             btn("Exit") { close(true) }
             col.addView(bar)
-            banner.setTextColor(Color.WHITE)
-            banner.setBackgroundColor(0xCC000000.toInt())
-            banner.setPadding(24, 8, 24, 8)
+            banner.setTextColor(Raden.CREAM)
+            banner.background = Raden.rounded(Raden.alpha(Raden.TEAL_DEEP, 0xE6), 22f, Raden.ORANGE, 3)
+            banner.setPadding(28, 12, 28, 12)
             col.addView(banner)
             root.addView(col, android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
             say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select / drag it.")
@@ -360,7 +360,7 @@ class OverlayService : Service() {
             private var dragging = Int.MIN_VALUE
 
             override fun onDraw(c: Canvas) {
-                c.drawColor(0x55000000)
+                c.drawColor(Raden.alpha(Raden.NIGHT, 0x66))
                 painter.draw(c, width.toFloat(), height.toFloat(), data, selected)
             }
 
@@ -413,9 +413,9 @@ class OverlayService : Service() {
 
     private inner class OverlayView(ctx: Context) : View(ctx) {
         private val painter = LayoutPainter(ctx)
-        private val bannerBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xDD15182A.toInt() }
+        private val bannerBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Raden.alpha(Raden.TEAL_DEEP, 0xDD) }
         private val bannerTxt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
+            color = Raden.CREAM
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
             textSize = 64f

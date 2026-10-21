@@ -115,30 +115,79 @@ class MainActivity : Activity() {
 
     private fun <T> safe(f: () -> T): T? = try { f() } catch (t: Throwable) { null }
 
+    private val modeBtns = ArrayList<Button>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
+            setPadding(48, 40, 48, 64)
+        }
+        // Header banner (Raden's teal menu panel)
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(56, 40, 56, 40)
+            background = Raden.rounded(Raden.TEAL, 44f)
+        }
+        header.addView(TextView(this).apply {
+            text = "Holomem Flicker"
+            textSize = 30f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Raden.CREAM)
+        })
+        header.addView(TextView(this).apply {
+            text = "Juufuutei Raden edition  ·  v${BuildConfig.VERSION_CODE}"
+            textSize = 15f
+            setTextColor(Raden.PLATINUM)
+        })
+        header.addView(View(this).apply { background = Raden.rounded(Raden.ORANGE, 6f) },
+            LinearLayout.LayoutParams(220, 10).apply { topMargin = 18 })
+        col.addView(header)
+
+        // Everything else goes into cream "cards"
+        var cur: LinearLayout = col
+        fun section(title: String?) {
+            cur = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(44, 30, 44, 34)
+                Raden.card(this)
+            }
+            col.addView(cur, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 30 })
+            if (title != null) cur.addView(TextView(this).apply {
+                text = title
+                Raden.heading(this)
+                setPadding(0, 0, 0, 8)
+            })
         }
         fun label(s: String, size: Float = 16f): TextView = TextView(this).apply {
             text = s
             textSize = size
-            setTextColor(Color.WHITE)
-            setPadding(0, 12, 0, 12)
-        }.also { col.addView(it) }
-        fun button(s: String, onClick: () -> Unit): Button = Button(this).apply {
+            setTextColor(Raden.INK)
+            setPadding(0, 10, 0, 10)
+        }.also { cur.addView(it) }
+        fun styled(b: Button, fill: Int) = b.also { Raden.pill(it, fill) }
+        fun button(s: String, fill: Int = Raden.TEAL, onClick: () -> Unit): Button = Button(this).apply {
             text = s
-            isAllCaps = false
+            Raden.pill(this, fill)
             setOnClickListener { onClick() }
-        }.also { col.addView(it) }
+        }.also { cur.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10; bottomMargin = 6 }) }
+        fun row(vararg bs: Button) {
+            val r = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            bs.forEachIndexed { i, b ->
+                r.addView(b, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    if (i > 0) leftMargin = 16
+                })
+            }
+            cur.addView(r, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10; bottomMargin = 6 })
+        }
         fun slider(name: String, key: String, def: Int, lo: Int, hi: Int, fmt: (Int) -> String) {
             val t = label("")
-            val cur = Prefs.getInt(this, key, def)
-            t.text = "$name: ${fmt(cur)}"
-            col.addView(SeekBar(this).apply {
+            val cur0 = Prefs.getInt(this, key, def)
+            t.text = "$name: ${fmt(cur0)}"
+            cur.addView(SeekBar(this).apply {
+                Raden.seek(this)
                 max = hi - lo
-                progress = cur - lo
+                progress = cur0 - lo
                 setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                     override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
                         Prefs.putInt(this@MainActivity, key, p + lo)
@@ -150,82 +199,54 @@ class MainActivity : Activity() {
             })
         }
 
-        label("Holomem Flicker", 26f).setTypeface(null, Typeface.BOLD)
+        section(null)
         label("Turn the Lenovo key mapper OFF (or use an empty profile) while this is running, or every press counts twice.", 14f)
-
+            .setTextColor(Raden.INK_SOFT)
         updateText = label("Version v${BuildConfig.VERSION_CODE}")
         button("Check for updates") { checkUpdate() }
-        updateBtn = button("Install update") { installUpdate() }.apply { visibility = View.GONE }
+        updateBtn = button("Install update", Raden.ORANGE) { installUpdate() }.apply { visibility = View.GONE }
 
+        section("Engine")
         shizukuText = label("Shizuku: checking…")
         button("Grant Shizuku access") { requestShizuku() }
-
-        button("▶ Start flicker") { start() }
-        button("■ Stop flicker") { stop() }
+        row(
+            styled(Button(this).apply { text = "▶  Start flicker"; setOnClickListener { start() } }, Raden.ORANGE),
+            styled(Button(this).apply { text = "■  Stop flicker"; setOnClickListener { stop() } }, Raden.CRIMSON)
+        )
         statusText = label("Engine: stopped")
-
-        layoutText = label("")
-        button("🎮 Controller test (buttons, sticks, and where touches land)") {
+        layoutText = label("", 14f).apply { setTextColor(Raden.INK_SOFT) }
+        button("Controller test (buttons, sticks, and where touches land)") {
             startActivity(Intent(this, ControllerTestActivity::class.java))
         }
 
-        label("Backup", 18f).setTypeface(null, Typeface.BOLD)
-        backupText = label("Save all your layouts and settings to a file, or load them back.", 14f)
-        button("Back up layouts & settings to a file") {
-            @Suppress("DEPRECATION")
-            startActivityForResult(
-                Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("application/json").putExtra(Intent.EXTRA_TITLE, "holomem-flicker-backup.json"),
-                REQ_EXPORT
-            )
-        }
-        button("Restore layouts & settings from a file") {
-            @Suppress("DEPRECATION")
-            startActivityForResult(
-                Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),
-                REQ_IMPORT
-            )
-        }
-
-        label("Lenovo mapper", 18f).setTypeface(null, Typeface.BOLD)
-        killText = label("")
-        updateKillText()
-        button("Pick the mapper app to stop on Start") { pickMapper() }
-        button("Don't stop any app") {
-            Prefs.putStr(this, Prefs.KILL_PKG, "")
-            updateKillText()
-        }
-
-        label("Modes", 18f).setTypeface(null, Typeface.BOLD)
-        label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode.", 14f)
+        section("Modes")
+        label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode, Select + Start to edit.", 14f)
+            .setTextColor(Raden.INK_SOFT)
         modeText = label("")
-        val modeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((i, name) in Prefs.MODE_NAMES.withIndex()) {
-            modeRow.addView(Button(this).apply {
+        modeBtns.clear()
+        row(*Prefs.MODE_NAMES.mapIndexed { i, name ->
+            Button(this).apply {
                 text = name
-                isAllCaps = false
+                Raden.pill(this, Raden.TEAL)
                 setOnClickListener { pickMode(i) }
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-        }
-        col.addView(modeRow)
-        val editRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((i, name) in Prefs.MODE_NAMES.withIndex()) {
-            editRow.addView(Button(this).apply {
+            }.also { modeBtns.add(it) }
+        }.toTypedArray())
+        row(*Prefs.MODE_NAMES.mapIndexed { i, name ->
+            styled(Button(this).apply {
                 text = "Edit $name"
-                isAllCaps = false
                 setOnClickListener {
                     startActivity(Intent(this@MainActivity, CalibrateActivity::class.java).putExtra("mode", i))
                 }
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-        }
-        col.addView(editRow)
+            }, Raden.TEAL_SOFT)
+        }.toTypedArray())
         button("Show / hide layout overlay now") {
             val sv = service
             if (sv == null) statusText.text = "Start the flicker first."
             else safe { sv.setOverlay(!(JSONObject(sv.inputState()).optBoolean("overlay"))) }
         }
 
-        label("Tuning (press Start again to apply)", 18f).setTypeface(null, Typeface.BOLD)
+        section("Tuning")
+        label("Press Start again to apply.", 14f).setTextColor(Raden.INK_SOFT)
         slider("Flick length", Prefs.RADIUS, 50, 15, 150) { "%.1f%% of screen width".format(it / 10f) }
         slider("Edge reach (stick pushed sideways)", Prefs.REACH, 18, 0, 40) { "$it% of screen width" }
         slider("Stick threshold (flick)", Prefs.DEAD, 35, 15, 80) { "$it%" }
@@ -234,8 +255,53 @@ class MainActivity : Activity() {
         axesBtn = button("") { cycleAxes() }
         updateAxesBtn()
 
-        label("Live input", 18f).setTypeface(null, Typeface.BOLD)
-        monitorText = label("-", 13f).apply { typeface = Typeface.MONOSPACE }
+        section("Lenovo mapper")
+        killText = label("")
+        updateKillText()
+        row(
+            styled(Button(this).apply { text = "Pick the mapper app to stop on Start"; setOnClickListener { pickMapper() } }, Raden.TEAL),
+            styled(Button(this).apply {
+                text = "Don't stop any app"
+                setOnClickListener {
+                    Prefs.putStr(this@MainActivity, Prefs.KILL_PKG, "")
+                    updateKillText()
+                }
+            }, Raden.TEAL_SOFT)
+        )
+
+        section("Backup")
+        backupText = label("Save all your layouts and settings to a file, or load them back.", 14f)
+        row(
+            styled(Button(this).apply {
+                text = "Back up to a file"
+                setOnClickListener {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                            .setType("application/json").putExtra(Intent.EXTRA_TITLE, "holomem-flicker-backup.json"),
+                        REQ_EXPORT
+                    )
+                }
+            }, Raden.TEAL),
+            styled(Button(this).apply {
+                text = "Restore from a file"
+                setOnClickListener {
+                    @Suppress("DEPRECATION")
+                    startActivityForResult(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),
+                        REQ_IMPORT
+                    )
+                }
+            }, Raden.TEAL)
+        )
+
+        section("Live input")
+        monitorText = label("-", 13f).apply {
+            typeface = Typeface.MONOSPACE
+            setTextColor(Raden.PLATINUM)
+            background = Raden.rounded(Raden.TEAL_DEEP, 24f)
+            setPadding(28, 22, 28, 22)
+        }
         lateinit var target: TextView
         button("Test touch (taps the box below by itself)") {
             val s = service
@@ -256,8 +322,10 @@ class MainActivity : Activity() {
             }
         }
         target = label("[ touch test box ]", 18f).apply {
-            setBackgroundColor(0xFF2E3A66.toInt())
-            setPadding(30, 40, 30, 40)
+            setTextColor(Raden.CREAM)
+            background = Raden.rounded(Raden.TEAL_SOFT, 24f, Raden.ORANGE, 4)
+            gravity = android.view.Gravity.CENTER
+            setPadding(30, 44, 30, 44)
             setOnTouchListener { _, e ->
                 if (e.actionMasked == android.view.MotionEvent.ACTION_DOWN) text = "✓ Touch received! Injection works."
                 true
@@ -268,8 +336,10 @@ class MainActivity : Activity() {
             monitorText.text = if (s == null) "Start the flicker first." else (safe { s.listDevices() } ?: "error")
         }
 
+        window.statusBarColor = Raden.TEAL_DEEP
+        window.navigationBarColor = Raden.MINT
         setContentView(ScrollView(this).apply {
-            setBackgroundColor(0xFF15182A.toInt())
+            setBackgroundColor(Raden.MINT)
             addView(col)
         })
 
@@ -409,6 +479,7 @@ class MainActivity : Activity() {
     private fun updateModeText() {
         val i = Prefs.getInt(this, Prefs.MODE, 0)
         modeText.text = "Current mode: ${Prefs.MODE_NAMES.getOrElse(i) { "?" }}"
+        modeBtns.forEachIndexed { j, b -> Raden.pill(b, if (j == i) Raden.CRIMSON else Raden.TEAL) }
     }
 
     private var updateSha: String? = null

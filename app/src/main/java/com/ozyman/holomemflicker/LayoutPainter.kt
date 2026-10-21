@@ -13,11 +13,11 @@ class LayoutPainter(private val ctx: Context) {
         strokeWidth = 5f
     }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = Raden.CREAM
         textSize = 34f
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
-        setShadowLayer(4f, 0f, 0f, Color.BLACK)
+        setShadowLayer(5f, 0f, 0f, Raden.INK)
     }
 
     /** [selected]: tap index, -1 = left stick, -2 = right stick, anything else = none. */
@@ -28,9 +28,9 @@ class LayoutPainter(private val ctx: Context) {
             val x = t.fx * w
             val y = t.fy * h
             val r = (t.fr * w).coerceAtLeast(26f)
-            fill.color = 0x772E7DFF
+            fill.color = Raden.alpha(Raden.TEAL, 0xAA)
             c.drawCircle(x, y, r, fill)
-            ring.color = if (i == selected) Color.YELLOW else Color.WHITE
+            ring.color = if (i == selected) Raden.ORANGE else Raden.CREAM
             c.drawCircle(x, y, r, ring)
             val label = if (t.code < 0) "?" else Prefs.buttonName(t.code)
             text.textSize = if (label.length > 3) 24f else 34f
@@ -44,10 +44,10 @@ class LayoutPainter(private val ctx: Context) {
         val y = fy * h
         val label = "$side stick · $type"
         val color = when (type) {
-            "flick" -> 0xFFFF66CC.toInt()
-            "joystick" -> 0xFF4ADE80.toInt()
-            "camera" -> 0xFFFBBF24.toInt()
-            else -> 0xFF8890B8.toInt()
+            "flick" -> Raden.ORANGE
+            "joystick" -> Raden.SEA_GLASS
+            "camera" -> Raden.PLATINUM
+            else -> Raden.TEAL_SOFT
         }
         val r = when (type) {
             "flick" -> Prefs.getInt(ctx, Prefs.RADIUS, 50) / 1000f * w
@@ -62,7 +62,7 @@ class LayoutPainter(private val ctx: Context) {
         }
         fill.color = (color and 0x00FFFFFF) or 0x55000000
         c.drawCircle(x, y, r, fill)
-        ring.color = if (sel) Color.YELLOW else color
+        ring.color = if (sel) Raden.CRIMSON else color
         c.drawCircle(x, y, r, ring)
         if (type == "camera") {
             // little arrows to show it's a swipe area

@@ -204,11 +204,11 @@ class ControllerTestActivity : Activity() {
     }
 
     private inner class Pad(ctx: Context) : View(ctx) {
-        private val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF262B44.toInt() }
+        private val body = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Raden.NIGHT_PANEL }
         private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = 4f
-            color = 0xFF8890B8.toInt()
+            color = Raden.TEAL_SOFT
         }
         private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
         private val txt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -217,12 +217,12 @@ class ControllerTestActivity : Activity() {
             isFakeBoldText = true
         }
         private val small = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFCCD2F0.toInt()
+            color = Raden.PLATINUM
             textAlign = Paint.Align.LEFT
             typeface = android.graphics.Typeface.MONOSPACE
         }
-        private val cyan = 0xFF22D3EE.toInt()
-        private val orange = 0xFFFF9F43.toInt()
+        private val cyan = Raden.SEA_GLASS
+        private val orange = Raden.ORANGE
 
         private fun stateColor(e: Boolean, a: Boolean): Int? = when {
             e -> cyan
@@ -232,17 +232,17 @@ class ControllerTestActivity : Activity() {
 
         private fun button(c: Canvas, label: String, x: Float, y: Float, r: Float, code: Int) {
             val col = stateColor(ek(code), ak(code))
-            fill.color = col ?: 0xFF3A4066.toInt()
+            fill.color = col ?: Raden.TEAL
             c.drawCircle(x, y, r, fill)
             c.drawCircle(x, y, r, line)
             txt.textSize = r * 0.8f
-            txt.color = if (col != null) Color.BLACK else Color.WHITE
+            txt.color = if (col != null) Raden.INK else Raden.CREAM
             c.drawText(label, x, y + r * 0.28f, txt)
         }
 
         private fun pill(c: Canvas, label: String, rect: RectF, code: Int, analog: Float = 0f) {
             val col = stateColor(ek(code), ak(code))
-            fill.color = 0xFF3A4066.toInt()
+            fill.color = Raden.TEAL
             c.drawRoundRect(rect, rect.height() / 2, rect.height() / 2, fill)
             if (analog > 0.02f) {
                 fill.color = cyan
@@ -255,33 +255,33 @@ class ControllerTestActivity : Activity() {
             }
             c.drawRoundRect(rect, rect.height() / 2, rect.height() / 2, line)
             txt.textSize = rect.height() * 0.55f
-            txt.color = if (col != null) Color.BLACK else Color.WHITE
+            txt.color = if (col != null) Raden.INK else Raden.CREAM
             c.drawText(label, rect.centerX(), rect.centerY() + rect.height() * 0.2f, txt)
         }
 
         private fun stick(c: Canvas, label: String, x: Float, y: Float, r: Float,
                           ex: Float, ey: Float, ax: Float, ay: Float, clickCode: Int) {
             val click = stateColor(ek(clickCode), ak(clickCode))
-            fill.color = 0xFF1A1E33.toInt()
+            fill.color = Raden.NIGHT
             c.drawCircle(x, y, r, fill)
-            line.color = click ?: 0xFF8890B8.toInt()
+            line.color = click ?: Raden.TEAL_SOFT
             line.strokeWidth = if (click != null) 10f else 4f
             c.drawCircle(x, y, r, line)
             line.strokeWidth = 4f
-            line.color = 0xFF8890B8.toInt()
+            line.color = Raden.TEAL_SOFT
             // threshold ring
             val dead = Prefs.getInt(context, Prefs.DEAD, 35) / 100f
-            fill.color = 0x22FFFFFF
+            fill.color = Raden.alpha(Raden.PLATINUM, 0x2A)
             c.drawCircle(x, y, r * dead, fill)
             // android dot (orange), engine dot (cyan)
             if (ax != 0f || ay != 0f) {
                 fill.color = orange
                 c.drawCircle(x + ax * r * 0.8f, y + ay * r * 0.8f, r * 0.22f, fill)
             }
-            fill.color = if (engineOk) cyan else 0xFF555B7A.toInt()
+            fill.color = if (engineOk) cyan else Raden.INK_SOFT
             c.drawCircle(x + ex * r * 0.8f, y + ey * r * 0.8f, r * 0.28f, fill)
             txt.textSize = r * 0.28f
-            txt.color = Color.WHITE
+            txt.color = Raden.CREAM
             c.drawText(label, x, y + r + r * 0.4f, txt)
             small.textSize = r * 0.2f
             small.textAlign = Paint.Align.CENTER
@@ -301,7 +301,7 @@ class ControllerTestActivity : Activity() {
             for ((dx, dy, on) in dirs) {
                 val cx = x + dx * s
                 val cy = y + dy * s
-                fill.color = if (on) (if (engineOk) cyan else orange) else 0xFF3A4066.toInt()
+                fill.color = if (on) (if (engineOk) cyan else orange) else Raden.TEAL
                 c.drawRect(cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2, fill)
                 c.drawRect(cx - s / 2, cy - s / 2, cx + s / 2, cy + s / 2, line)
             }
@@ -310,7 +310,7 @@ class ControllerTestActivity : Activity() {
         override fun onDraw(c: Canvas) {
             val w = width.toFloat()
             val h = height.toFloat()
-            c.drawColor(0xFF12152A.toInt())
+            c.drawColor(Raden.NIGHT)
 
             // grips + tablet bridge
             val lg = RectF(w * 0.02f, h * 0.22f, w * 0.30f, h * 0.96f)
@@ -320,7 +320,7 @@ class ControllerTestActivity : Activity() {
             c.drawRoundRect(lg, h * 0.12f, h * 0.12f, line)
             c.drawRoundRect(rg, h * 0.12f, h * 0.12f, line)
             val tab = RectF(w * 0.30f, h * 0.26f, w * 0.70f, h * 0.92f)
-            fill.color = 0xFF0B0D1A.toInt()
+            fill.color = 0xFF081815.toInt()
             c.drawRect(tab, fill)
             c.drawRect(tab, line)
 
@@ -352,25 +352,25 @@ class ControllerTestActivity : Activity() {
             // middle "screen": status + injected touches
             small.textSize = h * 0.026f
             var ty = tab.top + h * 0.05f
-            fun say(s: String, col: Int = 0xFFCCD2F0.toInt()) {
+            fun say(s: String, col: Int = Raden.PLATINUM) {
                 small.color = col
                 c.drawText(s, tab.left + 20f, ty, small)
                 ty += h * 0.035f
             }
-            say("CONTROLLER TEST", Color.WHITE)
-            say(if (engineOk) "■ cyan = flicker engine sees it ($eDevice)" else "■ flicker engine: not running (start it on the main screen)", cyan)
+            say("CONTROLLER TEST", Raden.CREAM)
+            say(if (engineOk) "■ teal = flicker engine sees it ($eDevice)" else "■ flicker engine: not running (start it on the main screen)", cyan)
             say("■ orange = Android sees it (with no flicker)", orange)
             say("Engine buttons: " + eKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Android buttons: " + aKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Touches received on this screen: $touchCount")
-            say("Dots below = where the flicker is touching", 0xFF8890B8.toInt())
+            say("Dots below = where the flicker is touching", Raden.TEAL_SOFT)
 
             // trails (drawn over everything, in real screen coords)
             val now = SystemClock.uptimeMillis()
             oldTrails.removeAll { now - it.upAt > 1200 }
             for (t in oldTrails + trails.values) {
                 val alpha = if (t.down) 255 else (255 * (1f - (now - t.upAt) / 1200f)).toInt().coerceIn(0, 255)
-                fill.color = Color.argb(alpha, 255, 102, 204)
+                fill.color = Color.argb(alpha, 224, 137, 91)
                 for (i in 1 until t.pts.size) {
                     val a = t.pts[i - 1]
                     val b = t.pts[i]
