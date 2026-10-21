@@ -115,6 +115,7 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Raden.apply(this)
         startForegroundNote()
         wm = getSystemService(WindowManager::class.java)
         try {
@@ -125,7 +126,7 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "reload") layouts.clear()
+        if (intent?.action == "reload") { layouts.clear(); Raden.apply(this) }
         return START_STICKY
     }
 

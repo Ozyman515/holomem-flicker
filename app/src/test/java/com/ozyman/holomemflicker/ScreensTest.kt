@@ -81,4 +81,61 @@ class ScreensTest {
         a.onGenericMotionEvent(ev)
         save(content(a), "5-controller-test", 2560, 1600)
     }
+
+    @Test
+    fun themePicker() {
+        val app = RuntimeEnvironment.getApplication()
+        Prefs.putStr(app, Raden.PREF_KEY, "raden")
+        val a = Robolectric.buildActivity(ThemePickerActivity::class.java).setup().get()
+        val scroll = (a.findViewById<ViewGroup>(android.R.id.content)).getChildAt(0) as ScrollView
+        save(scroll, "6-theme-picker", 2560, 1600)
+        val inner = scroll.getChildAt(0)
+        val bg = scroll.background
+        scroll.removeView(inner)
+        val holder = android.widget.FrameLayout(a).apply { background = bg; addView(inner) }
+        save(holder, "7-theme-picker-full", 2560)
+    }
+
+    @Test
+    fun mainKaela() {
+        val app = RuntimeEnvironment.getApplication()
+        Prefs.putStr(app, Raden.PREF_KEY, "kaela")
+        val a = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        save(content(a), "8-main-kaela", 2560, 1600)
+        Prefs.putStr(app, Raden.PREF_KEY, "suisei")
+        val b = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        save(content(b), "9-main-suisei", 2560, 1600)
+        Prefs.putStr(app, Raden.PREF_KEY, "raden")
+    }
+
+    @Test
+    fun icons() {
+        val app = RuntimeEnvironment.getApplication()
+        val keys = listOf("raden", "kaela", "towa", "bijou", "suisei", "miko", "korone", "pekora", "mococo", "fuwawa", "ollie", "lamy")
+        val s = 288
+        val bmp = Bitmap.createBitmap(s * 6, s * 2, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(0xFF202020.toInt())
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        keys.forEachIndexed { i, k ->
+            val x = (i % 6) * s
+            val y = (i / 6) * s
+            val t = ThemeData.byKey(k)
+            val path = android.graphics.Path().apply {
+                addCircle(x + s / 2f, y + s / 2f, s * 0.42f, android.graphics.Path.Direction.CW)
+            }
+            c.save()
+            c.clipPath(path)
+            paint.color = t.deep
+            c.drawRect(x.toFloat(), y.toFloat(), (x + s).toFloat(), (y + s).toFloat(), paint)
+            val id = app.resources.getIdentifier("ic_fan_$k", "drawable", app.packageName)
+            val d = app.resources.getDrawable(id, null)
+            // adaptive icons show the middle 72/108 of the layer
+            val pad = (s * 0.42f * 2 * (108f / 72f) - s) / 2
+            d.setBounds((x - pad).toInt(), (y - pad).toInt(), (x + s + pad).toInt(), (y + s + pad).toInt())
+            d.draw(c)
+            c.restore()
+        }
+        File(out, "10-icons.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 }

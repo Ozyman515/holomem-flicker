@@ -119,6 +119,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Raden.apply(this)
+        themeKey = Raden.current.key
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 40, 48, 64)
@@ -136,12 +138,17 @@ class MainActivity : Activity() {
             setTextColor(Raden.CREAM)
         })
         header.addView(TextView(this).apply {
-            text = "Juufuutei Raden edition  ·  v${BuildConfig.VERSION_CODE}"
+            text = "${Raden.current.name} theme  ·  v${BuildConfig.VERSION_CODE}"
             textSize = 15f
             setTextColor(Raden.PLATINUM)
         })
         header.addView(View(this).apply { background = Raden.rounded(Raden.ORANGE, 6f) },
             LinearLayout.LayoutParams(220, 10).apply { topMargin = 18 })
+        header.addView(Button(this).apply {
+            text = "🎨  Theme · ${Raden.current.short}"
+            Raden.pill(this, Raden.ORANGE)
+            setOnClickListener { startActivity(Intent(this@MainActivity, ThemePickerActivity::class.java)) }
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 22 })
         col.addView(header)
 
         // Everything else goes into cream "cards"
@@ -349,8 +356,14 @@ class MainActivity : Activity() {
         checkUpdate()
     }
 
+    private var themeKey = ""
+
     override fun onResume() {
         super.onResume()
+        if (Prefs.getStr(this, Raden.PREF_KEY, "raden") != themeKey) {
+            recreate()
+            return
+        }
         refreshShizuku()
         val sb = StringBuilder()
         for ((i, name) in Prefs.MODE_NAMES.withIndex()) {

@@ -51,6 +51,7 @@ class CalibrateActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Raden.apply(this)
         modeIdx = intent.getIntExtra("mode", 0)
         data = Prefs.load(this, modeIdx)
 

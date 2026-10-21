@@ -118,6 +118,7 @@ class ControllerTestActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Raden.apply(this)
         window.setDecorFitsSystemWindows(false)
         val root = FrameLayout(this)
         pad = Pad(this)

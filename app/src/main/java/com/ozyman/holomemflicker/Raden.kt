@@ -16,21 +16,43 @@ import android.widget.TextView
  * and her black / platinum hair for ink and highlights.
  */
 object Raden {
-    const val TEAL_DEEP = 0xFF16463E.toInt()   // darkest teal: header, editor banners
-    const val TEAL = 0xFF2B6E61.toInt()        // menu panel teal: buttons
-    const val TEAL_SOFT = 0xFF4F8E80.toInt()
-    const val MINT = 0xFFDDEBE6.toInt()        // page background
-    const val MINT_LINE = 0xFFB7D3CA.toInt()   // card borders
-    const val CREAM = 0xFFFBF7EE.toInt()       // cards / text on teal
-    const val PLATINUM = 0xFFE9E1CF.toInt()    // her hair highlight
-    const val INK = 0xFF1F2A28.toInt()         // her black hair: body text
+    // Live palette: starts as Raden's, swapped by [apply] when another member's theme is chosen.
+    var TEAL_DEEP = 0xFF16463E.toInt()   // darkest: header, editor banners
+    var TEAL = 0xFF2B6E61.toInt()        // main buttons
+    var TEAL_SOFT = 0xFF4F8E80.toInt()   // secondary buttons
+    var MINT = 0xFFDDEBE6.toInt()        // page background
+    var MINT_LINE = 0xFFB7D3CA.toInt()   // card borders
+    var CREAM = 0xFFFBF7EE.toInt()       // cards / text on dark
+    var PLATINUM = 0xFFE9E1CF.toInt()    // light highlight text on dark
+    const val INK = 0xFF1F2A28.toInt()         // body text
     const val INK_SOFT = 0xFF4A5B57.toInt()
-    const val ORANGE = 0xFFE0895B.toInt()      // sienna accent bar
-    const val ORANGE_DEEP = 0xFFC86D3F.toInt()
-    const val CRIMSON = 0xFF9E1C1F.toInt()     // selected tab red
-    const val NIGHT = 0xFF0E2622.toInt()       // dark screens (editor / controller test)
-    const val NIGHT_PANEL = 0xFF1C4039.toInt()
-    const val SEA_GLASS = 0xFF5ED1B3.toInt()   // bright teal: "engine sees it"
+    var ORANGE = 0xFFE0895B.toInt()      // accent: start / save / sliders
+    var ORANGE_DEEP = 0xFFC86D3F.toInt()
+    var CRIMSON = 0xFF9E1C1F.toInt()     // alert: stop / selected
+    var NIGHT = 0xFF0E2622.toInt()       // dark screens
+    var NIGHT_PANEL = 0xFF1C4039.toInt()
+    const val SEA_GLASS = 0xFF5ED1B3.toInt()   // "engine sees it" in the controller test
+
+    const val PREF_KEY = "theme"
+    var current: ThemeSpec = ThemeData.ALL[0]
+        private set
+
+    /** Load the saved theme into the live palette. Call at the top of every screen's onCreate. */
+    fun apply(ctx: android.content.Context) = use(ThemeData.byKey(Prefs.getStr(ctx, PREF_KEY, "raden")))
+
+    fun use(t: ThemeSpec) {
+        current = t
+        TEAL_DEEP = t.deep; TEAL = t.primary; TEAL_SOFT = t.soft
+        MINT = t.bg; MINT_LINE = t.line; CREAM = t.card
+        ORANGE = t.accent; ORANGE_DEEP = mix(t.accent, 0xFF000000.toInt(), 0.18f)
+        CRIMSON = t.alert; NIGHT = t.night; NIGHT_PANEL = mix(t.night, t.primary, 0.28f)
+        PLATINUM = mix(t.card, t.line, 0.45f)
+    }
+
+    fun mix(a: Int, b: Int, f: Float): Int {
+        fun ch(s: Int) = (((a shr s) and 0xFF) * (1 - f) + ((b shr s) and 0xFF) * f).toInt().coerceIn(0, 255)
+        return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+    }
 
     fun alpha(c: Int, a: Int): Int = (c and 0x00FFFFFF) or (a shl 24)
 
