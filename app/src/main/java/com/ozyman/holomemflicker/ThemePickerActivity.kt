@@ -42,7 +42,7 @@ class ThemePickerActivity : Activity() {
         picked = Raden.current
 
         val dm = resources.displayMetrics
-        val cols = max(4, min(9, (dm.widthPixels / dm.density / 118f).toInt()))
+        val cols = max(4, min(9, (dm.widthPixels / dm.density / 135f).toInt()))
 
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -86,7 +86,7 @@ class ThemePickerActivity : Activity() {
                 chunk.forEach { t ->
                     val b = Bubble(this, t)
                     bubbles.add(b)
-                    row.addView(b, LinearLayout.LayoutParams(0, (118 * dm.density).toInt(), 1f))
+                    row.addView(b, LinearLayout.LayoutParams(0, (150 * dm.density).toInt(), 1f))
                 }
                 repeat(cols - chunk.size) { row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f)) }
                 root.addView(row)
@@ -146,9 +146,9 @@ class ThemePickerActivity : Activity() {
         override fun onDraw(c: Canvas) {
             val w = width.toFloat()
             val h = height.toFloat()
-            val r = min(w, h * 0.78f) * 0.36f * pressedScale
+            val r = min(w * 0.5f, h * 0.36f) * 0.92f * pressedScale
             val cx = w / 2
-            val cy = h * 0.40f
+            val cy = h * 0.42f
             val sel = t.key == picked.key
             // drop shadow
             p.shader = null
@@ -162,8 +162,9 @@ class ThemePickerActivity : Activity() {
                 c.drawCircle(cx, cy, r * 1.08f, p)
             }
             // body: radial gradient soft -> primary -> deep
-            p.shader = RadialGradient(cx - r * 0.3f, cy - r * 0.35f, r * 1.5f,
-                intArrayOf(t.soft, t.primary, t.deep), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            p.shader = RadialGradient(cx - r * 0.25f, cy - r * 0.3f, r * 1.45f,
+                intArrayOf(Raden.mix(t.soft, Color.WHITE, 0.25f), t.soft, t.primary, Raden.mix(t.primary, t.deep, 0.5f)),
+                floatArrayOf(0f, 0.35f, 0.75f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(cx, cy, r, p)
             // accent "skittle" swirl across the lower half
             p.shader = null
