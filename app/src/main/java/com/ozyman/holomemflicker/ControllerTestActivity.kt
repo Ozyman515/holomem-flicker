@@ -275,6 +275,33 @@ class ControllerTestActivity : Activity() {
             c.drawText(label, rect.centerX(), rect.centerY() + rect.height() * 0.2f, txt)
         }
 
+        /** Left grip outline traced from the product photo, (u, v) pairs; the right grip is its mirror. */
+        private val GRIP = floatArrayOf(
+            1.00f, 0.02f, 0.55f, 0.00f, 0.25f, 0.03f, 0.08f, 0.14f, 0.00f, 0.40f, 0.03f, 0.70f,
+            0.14f, 0.92f, 0.36f, 1.00f, 0.62f, 0.96f, 0.88f, 0.82f, 0.99f, 0.60f
+        )
+
+        /** Smooth closed outline through the points (Catmull-Rom → cubic Béziers). */
+        private fun gripPath(pts: FloatArray, map: (Float, Float) -> FloatArray): android.graphics.Path {
+            val n = pts.size / 2
+            val p = Array(n) { map(pts[it * 2], pts[it * 2 + 1]) }
+            val path = android.graphics.Path()
+            path.moveTo(p[0][0], p[0][1])
+            for (i in 0 until n) {
+                val p0 = p[(i - 1 + n) % n]
+                val p1 = p[i]
+                val p2 = p[(i + 1) % n]
+                val p3 = p[(i + 2) % n]
+                path.cubicTo(
+                    p1[0] + (p2[0] - p0[0]) / 6f, p1[1] + (p2[1] - p0[1]) / 6f,
+                    p2[0] - (p3[0] - p1[0]) / 6f, p2[1] - (p3[1] - p1[1]) / 6f,
+                    p2[0], p2[1]
+                )
+            }
+            path.close()
+            return path
+        }
+
         val extraRects = LinkedHashMap<String, RectF>()
         private val dash = DashPathEffect(floatArrayOf(14f, 10f), 0f)
 
@@ -336,11 +363,7 @@ class ControllerTestActivity : Activity() {
             c.drawCircle(x + ex * r * 0.8f, y + ey * r * 0.8f, r * 0.28f, fill)
             txt.textSize = r * 0.28f
             txt.color = Raden.CREAM
-            c.drawText(label, x, y + r + r * 0.4f, txt)
-            small.textSize = r * 0.2f
-            small.textAlign = Paint.Align.CENTER
-            c.drawText("x %+.2f  y %+.2f".format(ex, ey), x, y + r + r * 0.7f, small)
-            small.textAlign = Paint.Align.LEFT
+            if (label.isNotEmpty()) c.drawText(label, x, y + r + r * 0.4f, txt)
         }
 
         private fun dpad(c: Canvas, x: Float, y: Float, s: Float) {
@@ -366,48 +389,56 @@ class ControllerTestActivity : Activity() {
             val h = height.toFloat()
             c.drawColor(Raden.NIGHT)
 
-            // grips + tablet bridge
-            val lg = RectF(w * 0.02f, h * 0.22f, w * 0.30f, h * 0.96f)
-            val rg = RectF(w * 0.70f, h * 0.22f, w * 0.98f, h * 0.96f)
-            c.drawRoundRect(lg, h * 0.12f, h * 0.12f, body)
-            c.drawRoundRect(rg, h * 0.12f, h * 0.12f, body)
-            c.drawRoundRect(lg, h * 0.12f, h * 0.12f, line)
-            c.drawRoundRect(rg, h * 0.12f, h * 0.12f, line)
-            val tab = RectF(w * 0.30f, h * 0.26f, w * 0.70f, h * 0.92f)
+            // grips, traced from a photo of the Kishi V3 Pro (u: 0 = outer edge, 1 = tablet side; v: 0 = top)
+            val lg = RectF(w * 0.02f, h * 0.22f, w * 0.30f, h * 0.98f)
+            val rg = RectF(w * 0.70f, h * 0.22f, w * 0.98f, h * 0.98f)
+            fun lx(u: Float) = lg.left + u * lg.width()
+            fun rx(u: Float) = rg.right - u * rg.width()
+            fun gy(v: Float) = lg.top + v * lg.height()
+            val gw = lg.width()
+            for (left in listOf(true, false)) {
+                val path = gripPath(GRIP) { u, v -> floatArrayOf(if (left) lx(u) else rx(u), gy(v)) }
+                c.drawPath(path, body)
+                c.drawPath(path, line)
+            }
+            val tab = RectF(w * 0.30f, h * 0.18f, w * 0.70f, h * 0.95f)
             fill.color = 0xFF081815.toInt()
-            c.drawRect(tab, fill)
-            c.drawRect(tab, line)
+            c.drawRoundRect(tab, 18f, 18f, fill)
+            c.drawRoundRect(tab, 18f, 18f, line)
 
-            val u = h * 0.05f
-            // shoulders
-            pill(c, "L2", RectF(w * 0.05f, h * 0.03f, w * 0.17f, h * 0.10f), 0x138, eTrig(false).coerceAtLeast(aa("lt")))
-            pill(c, "L1", RectF(w * 0.05f, h * 0.12f, w * 0.17f, h * 0.19f), 0x136)
-            extra(c, "L4", RectF(w * 0.19f, h * 0.125f, w * 0.27f, h * 0.185f))
-            pill(c, "R2", RectF(w * 0.83f, h * 0.03f, w * 0.95f, h * 0.10f), 0x139, eTrig(true).coerceAtLeast(aa("rt")))
-            pill(c, "R1", RectF(w * 0.83f, h * 0.12f, w * 0.95f, h * 0.19f), 0x137)
-            extra(c, "R4", RectF(w * 0.73f, h * 0.125f, w * 0.81f, h * 0.185f))
-            // rear paddles (on the back of the grips, drawn dashed)
-            extra(c, "M1", RectF(w * 0.004f, h * 0.50f, w * 0.036f, h * 0.80f), rear = true)
-            extra(c, "M2", RectF(w * 0.964f, h * 0.50f, w * 0.996f, h * 0.80f), rear = true)
+            // shoulders: trigger behind, bumper on the top edge, L4/R4 claw-grip button next to the tablet
+            pill(c, "L2", RectF(lx(0.12f), h * 0.03f, lx(0.58f), h * 0.10f), 0x138, eTrig(false).coerceAtLeast(aa("lt")))
+            pill(c, "L1", RectF(lx(0.12f), h * 0.12f, lx(0.58f), h * 0.19f), 0x136)
+            extra(c, "L4", RectF(lx(0.64f), h * 0.125f, lx(0.94f), h * 0.185f))
+            pill(c, "R2", RectF(rx(0.58f), h * 0.03f, rx(0.12f), h * 0.10f), 0x139, eTrig(true).coerceAtLeast(aa("rt")))
+            pill(c, "R1", RectF(rx(0.58f), h * 0.12f, rx(0.12f), h * 0.19f), 0x137)
+            extra(c, "R4", RectF(rx(0.94f), h * 0.125f, rx(0.64f), h * 0.185f))
+            // rear paddles (on the back of the handles, drawn dashed)
+            extra(c, "M1", RectF(w * 0.004f, gy(0.48f), w * 0.034f, gy(0.80f)), rear = true)
+            extra(c, "M2", RectF(w * 0.966f, gy(0.48f), w * 0.996f, gy(0.80f)), rear = true)
 
-            // left side: stick on top, d-pad below
-            stick(c, "Left stick", w * 0.13f, h * 0.42f, u * 2.4f, ea(0), ea(1), aa("lx"), aa("ly"), 0x13d)
-            dpad(c, w * 0.20f, h * 0.78f, u * 1.1f)
-            button(c, "⧉", w * 0.27f, h * 0.30f, u * 0.6f, 0x13a) // view / select
-            val sr = u * 0.6f
-            extra(c, "Share", RectF(w * 0.245f - sr * 1.6f, h * 0.60f - sr, w * 0.245f + sr * 1.6f, h * 0.60f + sr))
+            val sr = gw * 0.055f
+            // left face: stick up top, d-pad below toward the tablet, View top, Share bottom
+            stick(c, "", lx(0.47f), gy(0.30f), gw * 0.19f, ea(0), ea(1), aa("lx"), aa("ly"), 0x13d)
+            dpad(c, lx(0.66f), gy(0.56f), gw * 0.105f)
+            button(c, "⧉", lx(0.86f), gy(0.10f), sr, 0x13a) // view / select
+            extra(c, "Share", RectF(lx(0.86f) - sr * 1.7f, gy(0.74f) - sr, lx(0.86f) + sr * 1.7f, gy(0.74f) + sr))
 
-            // right side: ABXY on top, stick below
-            val bx = w * 0.86f
-            val by = h * 0.40f
-            button(c, "Y", bx, by - u * 1.6f, u * 0.85f, 0x134)
-            button(c, "A", bx, by + u * 1.6f, u * 0.85f, 0x130)
-            button(c, "X", bx - u * 1.6f, by, u * 0.85f, 0x133)
-            button(c, "B", bx + u * 1.6f, by, u * 0.85f, 0x131)
-            button(c, "☰", w * 0.73f, h * 0.30f, u * 0.6f, 0x13b) // start
-            button(c, "⌂", w * 0.73f, h * 0.86f, u * 0.6f, 0x13c) // home
-            extra(c, "Nexus", RectF(w * 0.745f - sr * 1.6f, h * 0.50f - sr, w * 0.745f + sr * 1.6f, h * 0.50f + sr))
-            stick(c, "Right stick", w * 0.80f, h * 0.72f, u * 2.4f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
+            // right face: ABXY up top, stick below toward the tablet, Menu top, Nexus middle, Home bottom
+            val bx = rx(0.50f)
+            val by = gy(0.28f)
+            val bs = gw * 0.15f
+            val br = gw * 0.075f
+            button(c, "Y", bx, by - bs, br, 0x134)
+            button(c, "A", bx, by + bs, br, 0x130)
+            button(c, "X", bx - bs, by, br, 0x133)
+            button(c, "B", bx + bs, by, br, 0x131)
+            button(c, "☰", rx(0.86f), gy(0.10f), sr, 0x13b) // menu / start
+            extra(c, "Nexus", RectF(rx(0.86f) - sr * 1.7f, gy(0.40f) - sr, rx(0.86f) + sr * 1.7f, gy(0.40f) + sr))
+            button(c, "⌂", rx(0.86f), gy(0.74f), sr, 0x13c) // home
+            stick(c, "", rx(0.62f), gy(0.60f), gw * 0.19f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
+            fill.color = Raden.SEA_GLASS // status LED
+            c.drawCircle(rx(0.30f), gy(0.45f), gw * 0.012f, fill)
 
             // middle "screen": status + injected touches
             small.textSize = h * 0.021f
@@ -422,6 +453,7 @@ class ControllerTestActivity : Activity() {
             say("■ orange = Android sees it (no flicker)", orange)
             say("Engine buttons: " + eKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Android buttons: " + aKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
+            say("Sticks  L x %+.2f y %+.2f   R x %+.2f y %+.2f".format(ea(0), ea(1), ea(eRx), ea(eRy)))
             say("Touches received on this screen: $touchCount")
             val lk = learningKey
             if (lk != null) say("Press $lk now… (tap it again to forget it)", Raden.ORANGE)
