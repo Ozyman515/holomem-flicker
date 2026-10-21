@@ -42,7 +42,24 @@ object Prefs {
         0x13d to "ThumbL", 0x13e to "ThumbR"
     )
 
-    fun buttonName(code: Int): String = names[code] ?: "0x%03x".format(code)
+    /** Kishi V3 Pro extra buttons (L4, R4, M1, M2, Share, Nexus) the user taught in the controller test. */
+    val EXTRA_KEYS = listOf("L4", "R4", "M1", "M2", "Share", "Nexus")
+    @Volatile private var extraLabels: Map<Int, String> = emptyMap()
+
+    fun extraCode(ctx: Context, key: String): Int = getInt(ctx, "extra_$key", -1)
+
+    fun setExtraCode(ctx: Context, key: String, code: Int) {
+        putInt(ctx, "extra_$key", code)
+        refreshExtras(ctx)
+    }
+
+    fun refreshExtras(ctx: Context) {
+        val m = HashMap<Int, String>()
+        for (k in EXTRA_KEYS) extraCode(ctx, k).takeIf { it >= 0 }?.let { m.putIfAbsent(it, k) }
+        extraLabels = m
+    }
+
+    fun buttonName(code: Int): String = names[code] ?: extraLabels[code] ?: "0x%03x".format(code)
 
     /** Live: the flick layout. */
     private fun liveDefaults(): Layout = Layout(
@@ -116,6 +133,7 @@ object Prefs {
     }
 
     fun load(ctx: Context, mode: Int = 0): Layout {
+        refreshExtras(ctx)
         val sp = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         val s = sp.getString("layout_$mode", null)
         if (s != null) return fromJson(JSONObject(s), defaults(mode))

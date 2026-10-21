@@ -66,6 +66,9 @@ class ScreensTest {
 
     @Test
     fun controllerTest() {
+        // demo state: L4/R4 taught as your current L3/R3 remap, the rest untaught
+        Prefs.setExtraCode(RuntimeEnvironment.getApplication(), "L4", 0x13d)
+        Prefs.setExtraCode(RuntimeEnvironment.getApplication(), "R4", 0x13e)
         val a = Robolectric.buildActivity(ControllerTestActivity::class.java).setup().get()
         save(content(a), "5-controller-test", 2560, 1600)
     }

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.ServiceConnection
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
@@ -56,6 +57,16 @@ class ControllerTestActivity : Activity() {
     private val oldTrails = ArrayList<Trail>()
     private var touchCount = 0
 
+    // Kishi V3 Pro extra buttons: tap one on the drawing, then press it, to learn its code
+    private var learningKey: String? = null
+
+    private fun bindExtra(code: Int) {
+        val k = learningKey ?: return
+        Prefs.setExtraCode(this, k, code)
+        learningKey = null
+        pad.invalidate()
+    }
+
     private val args by lazy {
         Shizuku.UserServiceArgs(ComponentName(packageName, FlickService::class.java.name))
             .daemon(true)
@@ -86,6 +97,7 @@ class ControllerTestActivity : Activity() {
                         ok = true
                         val k = HashSet<Int>()
                         for (i in 0 until keys.length()) k.add(keys.getInt(i))
+                        (k - eKeys).firstOrNull()?.let { if (learningKey != null) bindExtra(it) }
                         eKeys = k
                         val ax = HashMap<Int, Float>()
                         val axes = o.optJSONObject("axes")
@@ -153,6 +165,10 @@ class ControllerTestActivity : Activity() {
             KeyEvent.isGamepadButton(e.keyCode)
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (learningKey != null && event.scanCode > 0 && event.repeatCount == 0) {
+            bindExtra(event.scanCode)
+            return true
+        }
         if (isPad(event)) {
             aKeys.add(event.scanCode)
             pad.invalidate()
@@ -259,6 +275,44 @@ class ControllerTestActivity : Activity() {
             c.drawText(label, rect.centerX(), rect.centerY() + rect.height() * 0.2f, txt)
         }
 
+        val extraRects = LinkedHashMap<String, RectF>()
+        private val dash = DashPathEffect(floatArrayOf(14f, 10f), 0f)
+
+        /** An extra Kishi button (L4/R4/M1/M2/Share/Nexus): lights up with whatever code it was taught. */
+        private fun extra(c: Canvas, label: String, rect: RectF, rear: Boolean = false) {
+            extraRects[label] = rect
+            val code = Prefs.extraCode(context, label)
+            val col = if (code >= 0) stateColor(ek(code), ak(code)) else null
+            val rad = minOf(rect.width(), rect.height()) / 2
+            fill.color = col ?: Raden.TEAL_DEEP
+            c.drawRoundRect(rect, rad, rad, fill)
+            val learning = learningKey == label
+            line.color = when {
+                learning -> Raden.CRIMSON
+                code >= 0 -> Raden.ORANGE
+                else -> Raden.PLATINUM
+            }
+            line.strokeWidth = if (learning) 9f else 4f
+            if (rear || code < 0) line.pathEffect = dash
+            c.drawRoundRect(rect, rad, rad, line)
+            line.pathEffect = null
+            line.strokeWidth = 4f
+            line.color = Raden.TEAL_SOFT
+            txt.textSize = minOf(rect.height(), rect.width()) * 0.42f
+            txt.color = if (col != null) Raden.INK else Raden.CREAM
+            c.drawText(label, rect.centerX(), rect.centerY() + txt.textSize * 0.35f, txt)
+            small.textAlign = Paint.Align.CENTER
+            small.textSize = height * 0.019f
+            small.color = if (learning) Raden.ORANGE else Raden.PLATINUM
+            val sub = when {
+                learning -> "press it…"
+                code >= 0 -> "= " + if (code in 0x130..0x13e) Prefs.buttonName(code) else "0x%03x".format(code)
+                else -> "tap to test"
+            }
+            c.drawText(sub, rect.centerX(), rect.bottom + small.textSize * 1.25f, small)
+            small.textAlign = Paint.Align.LEFT
+        }
+
         private fun stick(c: Canvas, label: String, x: Float, y: Float, r: Float,
                           ex: Float, ey: Float, ax: Float, ay: Float, clickCode: Int) {
             val click = stateColor(ek(clickCode), ak(clickCode))
@@ -328,15 +382,20 @@ class ControllerTestActivity : Activity() {
             // shoulders
             pill(c, "L2", RectF(w * 0.05f, h * 0.03f, w * 0.17f, h * 0.10f), 0x138, eTrig(false).coerceAtLeast(aa("lt")))
             pill(c, "L1", RectF(w * 0.05f, h * 0.12f, w * 0.17f, h * 0.19f), 0x136)
-            pill(c, "ThumbL", RectF(w * 0.18f, h * 0.12f, w * 0.29f, h * 0.19f), 0x13d)
+            extra(c, "L4", RectF(w * 0.19f, h * 0.125f, w * 0.27f, h * 0.185f))
             pill(c, "R2", RectF(w * 0.83f, h * 0.03f, w * 0.95f, h * 0.10f), 0x139, eTrig(true).coerceAtLeast(aa("rt")))
             pill(c, "R1", RectF(w * 0.83f, h * 0.12f, w * 0.95f, h * 0.19f), 0x137)
-            pill(c, "ThumbR", RectF(w * 0.71f, h * 0.12f, w * 0.82f, h * 0.19f), 0x13e)
+            extra(c, "R4", RectF(w * 0.73f, h * 0.125f, w * 0.81f, h * 0.185f))
+            // rear paddles (on the back of the grips, drawn dashed)
+            extra(c, "M1", RectF(w * 0.004f, h * 0.50f, w * 0.036f, h * 0.80f), rear = true)
+            extra(c, "M2", RectF(w * 0.964f, h * 0.50f, w * 0.996f, h * 0.80f), rear = true)
 
             // left side: stick on top, d-pad below
             stick(c, "Left stick", w * 0.13f, h * 0.42f, u * 2.4f, ea(0), ea(1), aa("lx"), aa("ly"), 0x13d)
             dpad(c, w * 0.20f, h * 0.78f, u * 1.1f)
-            button(c, "⧉", w * 0.27f, h * 0.30f, u * 0.6f, 0x13a) // select
+            button(c, "⧉", w * 0.27f, h * 0.30f, u * 0.6f, 0x13a) // view / select
+            val sr = u * 0.6f
+            extra(c, "Share", RectF(w * 0.27f - sr * 1.6f, h * 0.60f - sr, w * 0.27f + sr * 1.6f, h * 0.60f + sr))
 
             // right side: ABXY on top, stick below
             val bx = w * 0.86f
@@ -347,22 +406,30 @@ class ControllerTestActivity : Activity() {
             button(c, "B", bx + u * 1.6f, by, u * 0.85f, 0x131)
             button(c, "☰", w * 0.73f, h * 0.30f, u * 0.6f, 0x13b) // start
             button(c, "⌂", w * 0.73f, h * 0.86f, u * 0.6f, 0x13c) // home
+            extra(c, "Nexus", RectF(w * 0.73f - sr * 1.6f, h * 0.60f - sr, w * 0.73f + sr * 1.6f, h * 0.60f + sr))
             stick(c, "Right stick", w * 0.80f, h * 0.72f, u * 2.4f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
 
             // middle "screen": status + injected touches
-            small.textSize = h * 0.026f
+            small.textSize = h * 0.021f
             var ty = tab.top + h * 0.05f
             fun say(s: String, col: Int = Raden.PLATINUM) {
                 small.color = col
                 c.drawText(s, tab.left + 20f, ty, small)
                 ty += h * 0.035f
             }
-            say("CONTROLLER TEST", Raden.CREAM)
-            say(if (engineOk) "■ teal = flicker engine sees it ($eDevice)" else "■ flicker engine: not running (start it on the main screen)", cyan)
-            say("■ orange = Android sees it (with no flicker)", orange)
+            say("KISHI V3 PRO TEST", Raden.CREAM)
+            say(if (engineOk) "■ teal = engine sees it ($eDevice)" else "■ engine not running (Start it on the main screen)", cyan)
+            say("■ orange = Android sees it (no flicker)", orange)
             say("Engine buttons: " + eKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Android buttons: " + aKeys.sorted().joinToString(" ") { Prefs.buttonName(it) })
             say("Touches received on this screen: $touchCount")
+            val lk = learningKey
+            if (lk != null) say("Press $lk now… (tap it again to forget it)", Raden.ORANGE)
+            else say("Dashed = extra button. Tap it, then press it.", Raden.PLATINUM)
+            say("Extras: " + Prefs.EXTRA_KEYS.joinToString("  ") { k ->
+                val cd = Prefs.extraCode(context, k)
+                "$k " + if (cd < 0) "?" else "0x%03x".format(cd)
+            })
             say("Dots below = where the flicker is touching", Raden.TEAL_SOFT)
 
             // trails (drawn over everything, in real screen coords)
@@ -389,6 +456,19 @@ class ControllerTestActivity : Activity() {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     val i = e.actionIndex
+                    val hitKey = extraRects.entries.firstOrNull { (_, r) ->
+                        RectF(r).apply { inset(-30f, -30f) }.contains(e.getX(i), e.getY(i))
+                    }?.key
+                    if (hitKey != null) {
+                        if (learningKey == hitKey) {
+                            Prefs.setExtraCode(context, hitKey, -1)
+                            learningKey = null
+                        } else {
+                            learningKey = hitKey
+                        }
+                        invalidate()
+                        return true
+                    }
                     val t = Trail()
                     t.pts.add(floatArrayOf(e.getX(i), e.getY(i)))
                     trails[e.getPointerId(i)] = t
