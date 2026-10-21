@@ -111,10 +111,10 @@ class ControllerTestActivity : Activity() {
         pad = Pad(this)
         root.addView(pad, FrameLayout.LayoutParams(-1, -1))
         root.addView(Button(this).apply {
-            text = "✕ Close"
-            isAllCaps = false
+            text = "✕  Close"
+            Raden.pill(this, Raden.CRIMSON)
             setOnClickListener { finish() }
-        }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
+        }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = 24 })
         setContentView(root)
         try {
             if (Shizuku.pingBinder()) Shizuku.bindUserService(args, conn)
