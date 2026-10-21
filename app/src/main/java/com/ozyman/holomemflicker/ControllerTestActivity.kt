@@ -309,7 +309,7 @@ class ControllerTestActivity : Activity() {
                 code >= 0 -> "= " + if (code in 0x130..0x13e) Prefs.buttonName(code) else "0x%03x".format(code)
                 else -> "tap to test"
             }
-            c.drawText(sub, rect.centerX(), rect.bottom + small.textSize * 1.25f, small)
+            if (!rear) c.drawText(sub, rect.centerX(), rect.bottom + small.textSize * 1.25f, small)
             small.textAlign = Paint.Align.LEFT
         }
 
@@ -395,7 +395,7 @@ class ControllerTestActivity : Activity() {
             dpad(c, w * 0.20f, h * 0.78f, u * 1.1f)
             button(c, "⧉", w * 0.27f, h * 0.30f, u * 0.6f, 0x13a) // view / select
             val sr = u * 0.6f
-            extra(c, "Share", RectF(w * 0.27f - sr * 1.6f, h * 0.60f - sr, w * 0.27f + sr * 1.6f, h * 0.60f + sr))
+            extra(c, "Share", RectF(w * 0.245f - sr * 1.6f, h * 0.60f - sr, w * 0.245f + sr * 1.6f, h * 0.60f + sr))
 
             // right side: ABXY on top, stick below
             val bx = w * 0.86f
@@ -406,7 +406,7 @@ class ControllerTestActivity : Activity() {
             button(c, "B", bx + u * 1.6f, by, u * 0.85f, 0x131)
             button(c, "☰", w * 0.73f, h * 0.30f, u * 0.6f, 0x13b) // start
             button(c, "⌂", w * 0.73f, h * 0.86f, u * 0.6f, 0x13c) // home
-            extra(c, "Nexus", RectF(w * 0.73f - sr * 1.6f, h * 0.60f - sr, w * 0.73f + sr * 1.6f, h * 0.60f + sr))
+            extra(c, "Nexus", RectF(w * 0.745f - sr * 1.6f, h * 0.50f - sr, w * 0.745f + sr * 1.6f, h * 0.50f + sr))
             stick(c, "Right stick", w * 0.80f, h * 0.72f, u * 2.4f, ea(eRx), ea(eRy), aa("rx"), aa("ry"), 0x13e)
 
             // middle "screen": status + injected touches
@@ -426,10 +426,12 @@ class ControllerTestActivity : Activity() {
             val lk = learningKey
             if (lk != null) say("Press $lk now… (tap it again to forget it)", Raden.ORANGE)
             else say("Dashed = extra button. Tap it, then press it.", Raden.PLATINUM)
-            say("Extras: " + Prefs.EXTRA_KEYS.joinToString("  ") { k ->
+            fun ex(keys: List<String>) = keys.joinToString("   ") { k ->
                 val cd = Prefs.extraCode(context, k)
                 "$k " + if (cd < 0) "?" else "0x%03x".format(cd)
-            })
+            }
+            say("Extras: " + ex(Prefs.EXTRA_KEYS.take(4)))
+            say("        " + ex(Prefs.EXTRA_KEYS.drop(4)))
             say("Dots below = where the flicker is touching", Raden.TEAL_SOFT)
 
             // trails (drawn over everything, in real screen coords)
