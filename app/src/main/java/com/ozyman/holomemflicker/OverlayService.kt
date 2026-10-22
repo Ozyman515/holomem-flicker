@@ -295,7 +295,12 @@ class OverlayService : Service() {
             banner.setPadding(28, 12, 28, 12)
             col.addView(banner)
             root.addView(col, android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-            say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select / drag it.")
+            val pad = NudgePad(ctx) { dx, dy ->
+                say(NudgePad.apply(data, selected, dx, dy, board.width, board.height)
+                    ?: "Tap a point or stick first, then use the arrows to fine-tune where it sits.")
+            }
+            root.addView(pad, pad.cornerParams())
+            say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select / drag it; the arrows nudge it.")
             val lp = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,

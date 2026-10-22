@@ -136,6 +136,8 @@ class CalibrateActivity : Activity() {
         }
         col.addView(banner)
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        val pad = NudgePad(this) { dx, dy -> nudge(dx, dy) }
+        root.addView(pad, pad.cornerParams())
         setContentView(root)
 
         Prefs.getStr(this, Prefs.BG, "").takeIf { it.isNotEmpty() }?.let { loadBg(Uri.parse(it)) }
@@ -221,6 +223,12 @@ class CalibrateActivity : Activity() {
         }
         t.fr = (t.fr * if (dir > 0) 1.2f else 1 / 1.2f).coerceIn(0.008f, 0.15f)
         say("${Prefs.buttonName(t.code)} circle: %.1f%% of screen width. Presses land randomly inside it.".format(t.fr * 100))
+    }
+
+    /** Precision d-pad: move the selected point / stick a couple of pixels. */
+    private fun nudge(dx: Int, dy: Int) {
+        val msg = NudgePad.apply(data, selected, dx, dy, board.width, board.height)
+        say(msg ?: "Tap a point or stick first, then use the arrows to fine-tune where it sits.")
     }
 
     private fun nextType(t: String): String {
