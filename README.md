@@ -9,6 +9,8 @@ Controller-to-touch mapper for hololive Dreams on Android (Legion Tab + Razer Ki
 - **Disclaimer**: shown on first launch (must be accepted to use the app) and any time from the Disclaimer tab, top right of the main screen.
 - **Battery**: nothing polls while the controller is idle. After a minute without input the flicker sleeps (overlay hidden, notification says "sleeping"); any button or stick push wakes it instantly, and that press still reaches the game.
 
+Built with Claude (Anthropic's AI): the code, screens and disclaimer were written by Claude under the project owner's direction.
+
 Runs through [Shizuku](https://shizuku.rikka.app/), which gives it shell-level access to read the controller and inject touches. No root needed.
 
 ## Install

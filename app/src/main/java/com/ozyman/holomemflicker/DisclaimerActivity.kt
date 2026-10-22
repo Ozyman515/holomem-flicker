@@ -62,6 +62,11 @@ class DisclaimerActivity : Activity() {
                 "The app stores your layouts and settings only on your device. It connects to the internet only to " +
                     "check GitHub for signed updates and download them."
             ),
+            "Made with AI" to listOf(
+                "Holomem Flicker was built with Claude, an AI model made by Anthropic. Claude wrote the app's code, " +
+                    "designed its screens and wrote this disclaimer, under the direction of the project owner, who tested it " +
+                    "and decided what it should do. Anthropic is not affiliated with this project and does not endorse it."
+            ),
             "Changes" to listOf(
                 "This disclaimer may be updated in future versions. By installing or continuing to use the app, you " +
                     "accept these terms. If you don't agree, uninstall it."
