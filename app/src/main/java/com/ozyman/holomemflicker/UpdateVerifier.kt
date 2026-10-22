@@ -9,14 +9,14 @@ import java.security.spec.X509EncodedKeySpec
 
 /**
  * Signed updates. A release is only trusted if update/release.json carries a valid
- * signature (update/release.json.sig) from the owner's offline release key - the same
- * RSA key as the lofi-room project. Only the PUBLIC half lives here; a hijacked
+ * signature (update/release.json.sig) from the owner's offline release key
+ * (holomem-flicker-update-key.pem, used only by this app - since v16; v15 and earlier trusted the lofi-room key). Only the PUBLIC half lives here; a hijacked
  * GitHub account can publish files but can't sign them.
  */
 object UpdateVerifier {
     /** Public half of the release key (tools/update_key.pub). */
     private const val PUBLIC_KEY_B64 =
-        "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoI1P08pxAVK/zjMDmTzQv+f/tbnXcYnq3Mbn5951idRDo+QJ1CjG/hwdodYdYoF6dPN9Pn1HyS/RYn9n37KWMShkGPv3aaU/0Cq3zAKKC3btCRqfpN2fiH5moIq9zyhmaF1oWtu9SsTKny6O6H1zdONbUVja+v4ZS5lXkkI7Sjn5Bs6rwA2sTk7lyVT9cqYCH8OsW8Uc9Ag+OsNKw2XFdEx78nIRuw3sYVEFa/i+fp3xE0bRncsMnT8FiMNTuF+JFs8X/wKcMhSZk8rpKQJfPGZ0AlBHrEvxBuiVU0yKcC8ZlRaNycq6rpxEUXOozboTBdScpbhAi8UwkFmTcRg7yVIxSquX0Ooyq4nAkkfBVr4rb6dKNlyY8LsqeadmaHZ4kw3Hcnnl7WiCO4LSDxt+kYVPi11czJ9Htna39Jo54+2wYiVjsjlCBvGACofPFQd+0XY6XtzN26dU4RI5W6svMkB1oR2e5c4Jcvf/k6C/R4Wj/7C+tPjnxOaLVGt3AUkvAgMBAAE="
+        "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAkcqqOsKDCTrNJQxJDYXFXgj0KSgBKHzWpZo+wKD3ViNmpwuJ2w9kkjAp869qDjCN504fHlY1GO4r5tw4l/IuEhXOUA1B0GA/8NBbfZHk7/gih01wFUzAdaQy54FAST0egWk9RLm/TFYFyaVnUogQ2l9lbKAA45iWosGY3LXmgEFd3+kAsLKm8FcypLIXLzP7mfIYhkv60DxXYcgIRmYrj7wKlxjJw9pYdFrEIouwuGOHOdTnd6RNbkHvuSS2yb/GlBSNR6e+YKyiVAhX6flb8vHT9EEulyxkz4m16lZBaSbSrm6xEzpRM7BSMLJxbScR9PuPrgFn3VjG8fjxTHNK4WBnAWRy8+stuIHMmO1Z/m0yeSPHZCBkrGSXGHfrfCaI4u7EzGJmtU9JE/u+hpP8lkGqSzDgU2iN8v/zoHeoPyz5By+IAQcWGtv0rS+xyzUeE7R+p2WwkLuB8JNxfY2pSkB+N5593AqqPwGXK/a+OVX3V6tvLi+FqfoWV3hGQj//AgMBAAE="
 
     const val MANIFEST_URL = "https://raw.githubusercontent.com/Ozyman515/holomem-flicker/main/update/release.json"
     const val SIG_URL = "https://raw.githubusercontent.com/Ozyman515/holomem-flicker/main/update/release.json.sig"
