@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Workflow safety check (nothing may run on issues / PRs)
+        run: bash tools/check-workflows.sh
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

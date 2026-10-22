@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup guide and troubleshooting
+    url: https://github.com/Ozyman515/holomem-flicker/blob/main/docs/SETUP.md
+    about: Most setup problems are covered here.
+  - name: Security problem
+    url: https://github.com/Ozyman515/holomem-flicker/blob/main/SECURITY.md
+    about: Please don't report security problems in public issues.

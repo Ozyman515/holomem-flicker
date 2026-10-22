@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Holomem Flicker maps **your own** button presses to touches, one press at a time.
+        Requests for auto-play, turbo, timing assistance or anything that plays for you won't be added.
+        Reports are public: don't include personal information, and paste text rather than links or files.
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+  - type: input
+    id: setup
+    attributes:
+      label: Your device and controller (optional)

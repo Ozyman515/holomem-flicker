@@ -13,6 +13,8 @@ Controller-to-touch mapper for hololive Dreams on Android (Legion Tab + Razer Ki
 
 Built with Claude (Anthropic's AI): the code, screens and disclaimer were written by Claude under the project owner's direction.
 
+Found a bug? Use the **Bug report** form under Issues (see [SECURITY.md](SECURITY.md) for security problems).
+
 Runs through [Shizuku](https://shizuku.rikka.app/), which gives it shell-level access to read the controller and inject touches. No root needed.
 
 ## Install
