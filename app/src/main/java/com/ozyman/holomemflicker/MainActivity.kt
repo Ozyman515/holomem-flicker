@@ -345,10 +345,22 @@ class MainActivity : Activity() {
 
         window.statusBarColor = Raden.TEAL_DEEP
         window.navigationBarColor = Raden.MINT
-        setContentView(ScrollView(this).apply {
+        // Page scrolls underneath; the Disclaimer tab stays pinned to the top-right corner.
+        val root = android.widget.FrameLayout(this)
+        root.addView(ScrollView(this).apply {
             setBackgroundColor(Raden.MINT)
             addView(col)
         })
+        root.addView(Button(this).apply {
+            text = "⚠ Disclaimer"
+            isAllCaps = false
+            textSize = 14f
+            Raden.pill(this, Raden.ORANGE)
+            setOnClickListener { openDisclaimer(false) }
+        }, android.widget.FrameLayout.LayoutParams(-2, -2, android.view.Gravity.TOP or android.view.Gravity.END).apply {
+            setMargins(0, 56, 76, 0)
+        })
+        setContentView(root)
 
         Shizuku.addBinderReceivedListenerSticky(binderListener)
         Shizuku.addBinderDeadListener(deadListener)
@@ -360,6 +372,11 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (!DisclaimerActivity.accepted(this)) {
+            // first launch, or the disclaimer changed: it has to be accepted before anything else
+            openDisclaimer(true)
+            return
+        }
         if (Prefs.getStr(this, Raden.PREF_KEY, "raden") != themeKey) {
             recreate()
             return

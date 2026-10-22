@@ -177,6 +177,7 @@ object Prefs {
         val o = JSONObject().put("app", "holomem-flicker").put("backupVersion", 1)
         val data = JSONObject()
         for ((k, v) in ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).all) {
+            if (k == DisclaimerActivity.PREF) continue // each install accepts the disclaimer itself
             when (v) {
                 is Int -> data.put(k, JSONObject().put("t", "i").put("v", v))
                 is String -> data.put(k, JSONObject().put("t", "s").put("v", v))
@@ -194,6 +195,7 @@ object Prefs {
         val ed = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
         var n = 0
         for (k in data.keys()) {
+            if (k == DisclaimerActivity.PREF) continue
             val e = data.getJSONObject(k)
             when (e.optString("t")) {
                 "i" -> ed.putInt(k, e.getInt("v"))

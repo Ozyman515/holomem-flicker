@@ -621,6 +621,10 @@
         <!-- THEME-ALIASES:END -->
 
         <activity
+            android:name=".DisclaimerActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".CalibrateActivity"
             android:exported="false"
             android:screenOrientation="sensorLandscape"

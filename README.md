@@ -6,6 +6,7 @@ Controller-to-touch mapper for hololive Dreams on Android (Legion Tab + Razer Ki
 - **Flicks**: each stick works like a steering wheel. Pushing it puts a finger down at that side's flick point and drags it outward, which the game reads as a flick. Pushing sideways shifts where the flick starts ("edge reach").
 - Everything runs as one multi-touch stream, so holds, taps and flicks can overlap.
 - **Precision d-pad**: both layout editors have on-screen arrows; each tap moves the selected point or stick 2 px (hold to repeat), and the middle button flips the pad to the other corner.
+- **Disclaimer**: shown on first launch (must be accepted to use the app) and any time from the Disclaimer tab, top right of the main screen.
 - **Battery**: nothing polls while the controller is idle. After a minute without input the flicker sleeps (overlay hidden, notification says "sleeping"); any button or stick push wakes it instantly, and that press still reaches the game.
 
 Runs through [Shizuku](https://shizuku.rikka.app/), which gives it shell-level access to read the controller and inject touches. No root needed.

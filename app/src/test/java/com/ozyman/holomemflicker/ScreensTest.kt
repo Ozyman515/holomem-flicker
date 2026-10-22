@@ -40,11 +40,13 @@ class ScreensTest {
 
     @Test
     fun main() {
+        Prefs.putInt(RuntimeEnvironment.getApplication(), DisclaimerActivity.PREF, DisclaimerActivity.VERSION)
         val a = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-        val scroll = content(a) as ScrollView
+        val root = content(a) as ViewGroup
+        val scroll = root.getChildAt(0) as ScrollView
         val w = 2560
-        // what you see when the app opens
-        save(scroll, "1-main-top", w, 1600)
+        // what you see when the app opens (with the Disclaimer tab)
+        save(root, "1-main-top", w, 1600)
         // the whole scrolling page in one tall image
         val inner = scroll.getChildAt(0)
         scroll.removeView(inner)
@@ -53,6 +55,39 @@ class ScreensTest {
             addView(inner)
         }
         save(holder, "2-main-full", w)
+    }
+
+    /** First launch: the disclaimer that must be accepted. */
+    @Test
+    fun disclaimer() {
+        val i = Intent(RuntimeEnvironment.getApplication(), DisclaimerActivity::class.java)
+            .putExtra(DisclaimerActivity.EXTRA_MUST_ACCEPT, true)
+        val a = Robolectric.buildActivity(DisclaimerActivity::class.java, i).setup().get()
+        val scroll = content(a) as ScrollView
+        val inner = scroll.getChildAt(0)
+        scroll.removeView(inner)
+        save(android.widget.FrameLayout(a).apply { setBackgroundColor(Raden.MINT); addView(inner) }, "11-disclaimer", 2560)
+    }
+
+    /** Not accepted yet: opening the app goes straight to the disclaimer; accepting lets you in. */
+    @Test
+    fun disclaimerGate() {
+        val ctx = RuntimeEnvironment.getApplication()
+        Prefs.putInt(ctx, DisclaimerActivity.PREF, 0)
+        val a = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val next = org.robolectric.Shadows.shadowOf(a).nextStartedActivity
+        org.junit.Assert.assertEquals(DisclaimerActivity::class.java.name, next?.component?.className)
+        org.junit.Assert.assertTrue(next!!.getBooleanExtra(DisclaimerActivity.EXTRA_MUST_ACCEPT, false))
+        val d = Robolectric.buildActivity(DisclaimerActivity::class.java, next).setup().get()
+        val accept = (content(d) as ScrollView).findViewsWithText("I understand and accept")
+        accept.performClick()
+        org.junit.Assert.assertTrue(DisclaimerActivity.accepted(ctx))
+    }
+
+    private fun ScrollView.findViewsWithText(t: String): View {
+        val found = ArrayList<View>()
+        findViewsWithText(found, t, View.FIND_VIEWS_WITH_TEXT)
+        return found.first()
     }
 
     private fun editor(mode: Int, name: String) {
