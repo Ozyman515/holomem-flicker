@@ -1,5 +1,7 @@
 # Holomem Flicker
 
+*An unofficial fan-made project. Not affiliated with or endorsed by COVER Corporation, hololive production or QualiArts.*
+
 Controller-to-touch mapper for hololive Dreams on Android (Legion Tab + Razer Kishi V3 Pro).
 
 - **Tap points**: holding a button = a finger held at that spot. Any button can have several points (one press, several fingers).

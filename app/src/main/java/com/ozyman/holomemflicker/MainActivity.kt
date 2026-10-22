@@ -138,6 +138,12 @@ class MainActivity : Activity() {
             setTextColor(Raden.CREAM)
         })
         header.addView(TextView(this).apply {
+            text = "An unofficial fan-made project"
+            textSize = 15f
+            setTypeface(typeface, Typeface.ITALIC)
+            setTextColor(Raden.CREAM)
+        })
+        header.addView(TextView(this).apply {
             text = "${Raden.current.name} theme  ·  v${BuildConfig.VERSION_CODE}"
             textSize = 15f
             setTextColor(Raden.PLATINUM)
