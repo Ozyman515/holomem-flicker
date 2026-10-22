@@ -30,6 +30,11 @@ class DisclaimerActivity : Activity() {
 
         /** title to paragraphs; a paragraph starting with "• " is a bullet. */
         val SECTIONS: List<Pair<String, List<String>>> = listOf(
+            "Made with AI" to listOf(
+                "Holomem Flicker was built with Claude, an AI model made by Anthropic. Claude wrote the app's code, " +
+                    "designed its screens and wrote this disclaimer, under the direction of the project owner, who tested it " +
+                    "and decided what it should do. Anthropic is not affiliated with this project and does not endorse it."
+            ),
             "Use at your own risk" to listOf(
                 "Holomem Flicker is a free, unofficial hobby project provided \"as is\" and \"as available\", " +
                     "without warranties of any kind, express or implied. That includes warranties of merchantability, " +
@@ -61,11 +66,6 @@ class DisclaimerActivity : Activity() {
             "Your data" to listOf(
                 "The app stores your layouts and settings only on your device. It connects to the internet only to " +
                     "check GitHub for signed updates and download them."
-            ),
-            "Made with AI" to listOf(
-                "Holomem Flicker was built with Claude, an AI model made by Anthropic. Claude wrote the app's code, " +
-                    "designed its screens and wrote this disclaimer, under the direction of the project owner, who tested it " +
-                    "and decided what it should do. Anthropic is not affiliated with this project and does not endorse it."
             ),
             "Changes" to listOf(
                 "This disclaimer may be updated in future versions. By installing or continuing to use the app, you " +
