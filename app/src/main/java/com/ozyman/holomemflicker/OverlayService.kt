@@ -74,45 +74,73 @@ class OverlayService : Service() {
         }
     }
 
-    private val poll = object : Runnable {
-        override fun run() {
+    /**
+     * Long-polls the engine on a background thread: the engine only answers when something
+     * changes (a button, a touch, the mode, sleep/wake), so nothing runs while the controller
+     * is left alone. The overlay is only redrawn when an answer arrives or a trail is fading.
+     */
+    @Volatile private var alive = true
+    private var sleeping = false
+    private val poller = Thread({
+        var seq = -1L
+        while (alive) {
             val s = service
-            if (s != null) try {
-                val o = JSONObject(s.inputState())
-                if (o.has("mode")) {
-                    val newMode = o.optInt("mode")
-                    val seq = o.optInt("modeSeq")
-                    overlayOn = o.optBoolean("overlay")
-                    modeName = o.optString("modeName")
-                    if (lastSeq >= 0 && seq != lastSeq) bannerUntil = SystemClock.uptimeMillis() + 1500
-                    if (newMode != modeIdx) Prefs.putInt(this@OverlayService, Prefs.MODE, newMode)
-                    lastSeq = seq
-                    modeIdx = newMode
-                    val keys = o.optJSONArray("keys")
-                    val pr = HashSet<Int>()
-                    if (keys != null) for (i in 0 until keys.length()) pr.add(keys.getInt(i))
-                    pressedNow = pr
-                    val editing = o.optBoolean("editing")
-                    val lk = o.optString("lastKey")
-                    val ed = editor
-                    if (editing && ed == null) {
-                        openEditor()
-                    } else if (!editing && ed != null && !ed.closing) {
-                        ed.saveAndClose(false) // closed with Select+Start: keep the changes
-                    }
-                    if (lk != lastKeySeen) {
-                        val code = lk.substringAfter(':').toIntOrNull()
-                        if (lastKeySeen.isNotEmpty() && code != null) editor?.onKey(code, pressedNow)
-                        lastKeySeen = lk
-                    }
-                    editor?.onPoll(pressedNow)
-                    touches.read(o.optJSONArray("trace"), SystemClock.uptimeMillis())
-                }
+            if (s == null) { SystemClock.sleep(500); continue }
+            val json = try {
+                s.waitState(seq, touches.since(), if (sleeping) 30_000 else 5_000)
             } catch (_: Throwable) {
+                SystemClock.sleep(500)
+                continue
             }
-            refresh()
-            handler.postDelayed(this, if (overlayOn) 33 else 80)
+            val o = try { JSONObject(json) } catch (_: Throwable) { null }
+            if (o == null || !o.has("mode")) { seq = -1; SystemClock.sleep(500); continue }
+            seq = o.optLong("seq", -1)
+            val done = java.util.concurrent.CountDownLatch(1)
+            handler.post { try { apply(o) } finally { done.countDown() } }
+            try { done.await(1, java.util.concurrent.TimeUnit.SECONDS) } catch (_: InterruptedException) {}
         }
+    }, "overlay-poll")
+
+    private fun apply(o: JSONObject) {
+        try {
+            val newMode = o.optInt("mode")
+            val seq = o.optInt("modeSeq")
+            overlayOn = o.optBoolean("overlay")
+            modeName = o.optString("modeName")
+            if (lastSeq >= 0 && seq != lastSeq) {
+                bannerUntil = SystemClock.uptimeMillis() + 1500
+                handler.postDelayed({ refresh() }, 1550) // drop the banner window afterwards
+            }
+            if (newMode != modeIdx) Prefs.putInt(this, Prefs.MODE, newMode)
+            lastSeq = seq
+            modeIdx = newMode
+            val nowSleeping = o.optBoolean("sleeping")
+            if (nowSleeping != sleeping) {
+                sleeping = nowSleeping
+                updateNote()
+            }
+            val keys = o.optJSONArray("keys")
+            val pr = HashSet<Int>()
+            if (keys != null) for (i in 0 until keys.length()) pr.add(keys.getInt(i))
+            pressedNow = pr
+            val editing = o.optBoolean("editing")
+            val lk = o.optString("lastKey")
+            val ed = editor
+            if (editing && ed == null) {
+                openEditor()
+            } else if (!editing && ed != null && !ed.closing) {
+                ed.saveAndClose(false) // closed with Select+Start: keep the changes
+            }
+            if (lk != lastKeySeen) {
+                val code = lk.substringAfter(':').toIntOrNull()
+                if (lastKeySeen.isNotEmpty() && code != null) editor?.onKey(code, pressedNow)
+                lastKeySeen = lk
+            }
+            editor?.onPoll(pressedNow)
+            touches.read(o.optJSONArray("trace"), SystemClock.uptimeMillis())
+        } catch (_: Throwable) {
+        }
+        refresh()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -126,7 +154,7 @@ class OverlayService : Service() {
             if (Shizuku.pingBinder()) Shizuku.bindUserService(args, conn)
         } catch (_: Throwable) {
         }
-        handler.post(poll)
+        poller.start()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -135,7 +163,9 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(poll)
+        alive = false
+        poller.interrupt()
+        handler.removeCallbacksAndMessages(null)
         removeView()
         editor?.remove()
         editor = null
@@ -143,19 +173,31 @@ class OverlayService : Service() {
         super.onDestroy()
     }
 
-    private fun startForegroundNote() {
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel("flicker", "Holomem Flicker", NotificationManager.IMPORTANCE_LOW))
+    private fun note(): Notification {
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
-        val n = Notification.Builder(this, "flicker")
-            .setContentTitle("Holomem Flicker is running")
-            .setContentText("Select+L1: show layout · Select+R1: switch mode")
-            .setSmallIcon(android.R.drawable.ic_media_ff)
+        return Notification.Builder(this, "flicker")
+            .setContentTitle(if (sleeping) "Holomem Flicker is sleeping" else "Holomem Flicker is running")
+            .setContentText(
+                if (sleeping) "No controller input for a minute · press any button or move a stick to wake"
+                else "Select+L1: show layout · Select+R1: switch mode"
+            )
+            .setSmallIcon(if (sleeping) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_ff)
             .setContentIntent(open)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .build()
+    }
+
+    private fun updateNote() {
+        try { getSystemService(NotificationManager::class.java).notify(1, note()) } catch (_: Throwable) {}
+    }
+
+    private fun startForegroundNote() {
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(NotificationChannel("flicker", "Holomem Flicker", NotificationManager.IMPORTANCE_LOW))
+        val n = note()
         if (android.os.Build.VERSION.SDK_INT >= 34) {
             startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -167,7 +209,7 @@ class OverlayService : Service() {
 
     private fun refresh() {
         val showBanner = SystemClock.uptimeMillis() < bannerUntil
-        val want = (overlayOn || showBanner) && editor == null
+        val want = (overlayOn || showBanner) && editor == null && !sleeping
         if (want && view == null) addView()
         if (!want && view != null) removeView()
         view?.invalidate()
@@ -351,6 +393,8 @@ class OverlayService : Service() {
             }.start()
             bannerUntil = SystemClock.uptimeMillis() + 1200
             modeName = "Saved · " + Prefs.MODE_NAMES.getOrElse(mode) { "" }
+            refresh()
+            handler.postDelayed({ refresh() }, 1250)
         }
 
         fun close(tellEngine: Boolean) {
@@ -358,6 +402,7 @@ class OverlayService : Service() {
             remove()
             editor = null
             if (tellEngine) try { service?.setEditing(false) } catch (_: Throwable) {}
+            refresh()
         }
 
         private inner class Board : View(ctx) {

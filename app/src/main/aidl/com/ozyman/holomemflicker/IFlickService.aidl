@@ -19,4 +19,6 @@ interface IFlickService {
     String findPackages() = 14;
     String forceStop(String pkg) = 15;
     String installVerified(String url, String sha256) = 16;
+    // Long poll: returns the state once it changes past sinceSeq (or after timeoutMs).
+    String waitState(long sinceSeq, int traceSince, int timeoutMs) = 17;
 }

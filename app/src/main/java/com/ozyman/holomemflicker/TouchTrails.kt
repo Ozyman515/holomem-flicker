@@ -17,6 +17,9 @@ class TouchTrails {
     private var seq = 0
     private var sync = true // first read after the overlay turns on: skip touches that already ended
 
+    /** Which log entries to ask the engine for next: only newer ones, or the whole log (-1) after a reset. */
+    fun since(): Int = if (sync) -1 else seq
+
     fun read(tr: JSONArray?, now: Long) {
         if (tr == null) { strokes.clear(); sync = true; return }
         if (tr.length() > 0 && tr.getJSONArray(tr.length() - 1).getInt(0) < seq) sync = true // engine restarted

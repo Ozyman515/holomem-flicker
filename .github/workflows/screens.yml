@@ -23,7 +23,7 @@ jobs:
       - name: Render screens
         run: |
           set -o pipefail
-          gradle --no-daemon testDebugUnitTest --tests '*ScreensTest*' 2>&1 | tee test.log
+          gradle --no-daemon testDebugUnitTest --tests '*ScreensTest*' --tests '*BatteryTest*' 2>&1 | tee test.log
       - name: Publish to screens-out branch
         if: always()
         run: |

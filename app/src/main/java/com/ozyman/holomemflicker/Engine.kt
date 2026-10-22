@@ -6,6 +6,7 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import kotlin.math.hypot
 import kotlin.math.min
@@ -97,6 +98,51 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     private val recent = ArrayDeque<String>()
     private val timer = Executors.newSingleThreadScheduledExecutor()
+
+    // ---- battery: change counter (overlay long-polls it), on-demand camera ticker, idle sleep ----
+    private val seqLock = Object()
+    private var changeSeq = 0L
+    private var ticker: ScheduledFuture<*>? = null
+    @Volatile var sleeping = false
+        private set
+    @Volatile private var lastActive = nowMs()
+    private var idleCheck: ScheduledFuture<*>? = null
+    private val idleMs = cfg.optLong("idleMs", IDLE_MS)
+
+    private fun nowMs(): Long = System.nanoTime() / 1_000_000
+
+    /** Starts the sleep countdown (the engine thread does this once it's listening; tests call it directly). */
+    fun startIdleTimer() = scheduleIdleCheck(idleMs)
+
+    /** For tests: a controller button pressed / released, as if read from the device. */
+    fun simulateKey(code: Int, down: Boolean) {
+        synchronized(this) {
+            if (down) markActive()
+            if (down) pressed.add(code) else pressed.remove(code)
+        }
+        bump()
+    }
+
+    /** Something the overlay shows changed: wake anyone waiting in [waitChange]. */
+    private fun bump() {
+        synchronized(seqLock) {
+            changeSeq++
+            seqLock.notifyAll()
+        }
+    }
+
+    /** Blocks until the state changes past [since] or [timeoutMs] passes. Returns the current change number. */
+    fun waitChange(since: Long, timeoutMs: Long): Long {
+        synchronized(seqLock) {
+            val end = nowMs() + timeoutMs
+            while (changeSeq == since && running) {
+                val left = end - nowMs()
+                if (left <= 0) break
+                seqLock.wait(left)
+            }
+            return changeSeq
+        }
+    }
 
     /** One input node being read. Several are read at once, because system mappers
      *  (Lenovo's included) may hide the real controller behind a virtual one. */
@@ -190,8 +236,14 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     /** Snapshot for the controller test screen and the overlay. */
     @Synchronized
-    fun stateJson(): String {
+    fun stateJson(): String = stateJson(-1)
+
+    /** [traceSince]: only touch-log entries newer than this (-1 = the whole log). */
+    @Synchronized
+    fun stateJson(traceSince: Int): String {
         val o = JSONObject()
+        o.put("seq", synchronized(seqLock) { changeSeq })
+        o.put("sleeping", sleeping)
         o.put("keys", JSONArray(pressed.toList()))
         val axes = JSONObject()
         val a = active
@@ -208,9 +260,12 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("editing", editing)
         o.put("lastKey", lastKey)
         o.put("running", status.startsWith("Running"))
-        if (overlayOn) inj?.let { i ->
+        if (overlayOn && !sleeping) inj?.let { i ->
             val tr = JSONArray()
-            for (e in i.trace()) tr.put(JSONArray().put(e[0].toInt()).put(e[1].toInt()).put(e[2].toDouble()).put(e[3].toDouble()).put(e[4].toInt()))
+            val log = i.trace()
+            // a log that ends below what the overlay has seen means the engine restarted: send it all
+            val since = if (log.isNotEmpty() && log.last()[0].toInt() < traceSince) -1 else traceSince
+            for (e in log) if (e[0].toInt() > since) tr.put(JSONArray().put(e[0].toInt()).put(e[1].toInt()).put(e[2].toDouble()).put(e[3].toDouble()).put(e[4].toInt()))
             o.put("trace", tr)
         }
         return o.toString()
@@ -218,6 +273,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     fun shutdown() {
         running = false
+        bump()
         for (r in readers) try { r.stream?.close() } catch (_: Throwable) {}
         try { inj?.releaseAll() } catch (_: Throwable) {}
         timer.shutdownNow()
@@ -230,11 +286,13 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         modeIdx = i
         modeSeq++
         note("mode → ${mode.name}")
+        bump()
     }
 
     @Synchronized
     fun setOverlay(on: Boolean) {
         overlayOn = on
+        bump()
     }
 
     /** In-game editor open: nothing reaches the game. */
@@ -242,6 +300,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     fun setEditing(on: Boolean) {
         if (on) releaseMode()
         editing = on
+        bump()
     }
 
     private fun releaseMode() {
@@ -285,6 +344,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     private fun loop() {
         val injector = TouchInjector()
+        injector.onRecord = { bump() }
         inj = injector
         val devs = DeviceScanner.scan()
         val cands = DeviceScanner.candidates(devs, forcedPath)
@@ -320,7 +380,9 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         active = readers.firstOrNull { it.dev === main }
         status = "Running: listening to ${readers.size} input device(s), main = ${main.name}, right stick axes %02x/%02x"
             .format(right.first, right.second)
-        timer.scheduleAtFixedRate(Runnable { tick() }, 16, 16, TimeUnit.MILLISECONDS)
+        // the 60 Hz ticker only runs while a camera stick is pushed (see startTicker)
+        startIdleTimer()
+        bump()
         for (r in readers) r.start()
         for (r in readers) r.join()
     }
@@ -331,14 +393,75 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         val injector = inj ?: return
         nEvents++
         if (type == 1) nKeys++
+        if (isActivity(r, type, code, value)) markActive()
         when (type) {
             1 -> key(injector, r, code, value)
             3 -> { // EV_ABS
                 r.raw[code] = value
                 active = r
             }
-            0 -> if (code == 0 && active === r && !editing) for (s in mode.sticks) stick(injector, r, s) // SYN_REPORT
+            0 -> if (code == 0 && active === r && !editing) { // SYN_REPORT
+                for (s in mode.sticks) stick(injector, r, s)
+                if (ticker == null && mode.sticks.any { it.type == "camera" && hypot(r.norm(it.ax), r.norm(it.ay)) >= it.dead }) startTicker()
+            }
         }
+    }
+
+    /** A real press or a real stick push - not the resting jitter some sticks send nonstop. */
+    private fun isActivity(r: Reader, type: Int, code: Int, value: Int): Boolean = when (type) {
+        1 -> value != 2
+        3 -> when (code) {
+            0, 1, rAx, rAy -> { r.raw[code] = value; Math.abs(r.norm(code)) > 0.3f }
+            0x10, 0x11 -> value != 0 // d-pad
+            else -> false
+        }
+        else -> false
+    }
+
+    /** Controller used: wake up if asleep, and push the sleep timer back. */
+    private fun markActive() {
+        lastActive = nowMs()
+        if (sleeping) {
+            sleeping = false
+            note("awake")
+            scheduleIdleCheck(idleMs)
+            bump()
+        }
+    }
+
+    private fun scheduleIdleCheck(delay: Long) {
+        idleCheck?.cancel(false)
+        idleCheck = try {
+            timer.schedule(Runnable { idleCheck() }, delay, TimeUnit.MILLISECONDS)
+        } catch (_: Throwable) { null }
+    }
+
+    /** Fires once per idle period (no polling): sleeps if the controller has been left alone. */
+    private fun idleCheck() {
+        synchronized(this) {
+            if (!running || sleeping) return
+            val quiet = nowMs() - lastActive
+            val fingers = inj?.count() ?: 0
+            if (quiet < idleMs || fingers > 0 || editing) {
+                scheduleIdleCheck(if (quiet < idleMs) idleMs - quiet else idleMs)
+                return
+            }
+            sleeping = true
+            stopTicker()
+            note("sleeping (no controller input for ${idleMs / 1000}s)")
+        }
+        bump()
+    }
+
+    private fun startTicker() {
+        ticker = try {
+            timer.scheduleAtFixedRate(Runnable { tick() }, 0, 16, TimeUnit.MILLISECONDS)
+        } catch (_: Throwable) { null }
+    }
+
+    private fun stopTicker() {
+        ticker?.cancel(false)
+        ticker = null
     }
 
     private fun key(injector: TouchInjector, r: Reader, code: Int, value: Int) {
@@ -448,9 +571,9 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private fun tick() {
         try {
             synchronized(this) {
-                val injector = inj ?: return
-                val a = active ?: return
-                if (modes.isEmpty() || editing || !running) return
+                val injector = inj ?: return stopTicker()
+                val a = active ?: return stopTicker()
+                if (modes.isEmpty() || editing || !running) { stopTicker(); return }
                 for (s in mode.sticks) {
                     if (s.type != "camera") continue
                     val x = a.norm(s.ax)
@@ -480,8 +603,15 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                         }
                     }
                 }
+                // no camera finger down any more: let the CPU rest until the next push
+                if (mode.sticks.none { it.type == "camera" && it.pid >= 0 }) stopTicker()
             }
         } catch (_: Throwable) {
         }
+    }
+
+    companion object {
+        /** No controller input for this long = sleep (overlay hidden, nothing ticking). */
+        const val IDLE_MS = 60_000L
     }
 }

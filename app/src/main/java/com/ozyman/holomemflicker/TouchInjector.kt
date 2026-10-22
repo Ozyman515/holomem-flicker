@@ -56,11 +56,15 @@ class TouchInjector {
     private var seq = 0
     private var strokes = 0
 
+    /** Called after every logged touch point (the engine uses it to wake the overlay). */
+    @Volatile var onRecord: (() -> Unit)? = null
+
     private fun record(id: Int, x: Float, y: Float, kind: Int) {
         if (kind == 0) strokeOf[id] = ++strokes
         val st = strokeOf[id] ?: return
         log.addLast(floatArrayOf((++seq).toFloat(), st.toFloat(), x, y, kind.toFloat()))
         while (log.size > 160) log.removeFirst()
+        onRecord?.invoke()
     }
 
     /** Recently logged touch points, oldest first. */

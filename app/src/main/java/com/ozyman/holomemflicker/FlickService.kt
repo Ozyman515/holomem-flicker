@@ -99,6 +99,17 @@ class FlickService : IFlickService.Stub() {
 
     override fun inputState(): String = engine?.stateJson() ?: "{}"
 
+    /** The overlay parks a thread here; it costs nothing until the engine reports a change. */
+    override fun waitState(sinceSeq: Long, traceSince: Int, timeoutMs: Int): String {
+        val e = engine
+        if (e == null) {
+            Thread.sleep(timeoutMs.coerceIn(0, 1000).toLong())
+            return "{}"
+        }
+        e.waitChange(sinceSeq, timeoutMs.coerceIn(0, 30_000).toLong())
+        return e.stateJson(traceSince)
+    }
+
     override fun setMode(mode: Int) {
         engine?.setMode(mode)
     }
