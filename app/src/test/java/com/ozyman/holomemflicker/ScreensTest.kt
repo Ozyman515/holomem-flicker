@@ -61,6 +61,43 @@ class ScreensTest {
         save(content(a), name, 2560, 1600)
     }
 
+    /** The in-game overlay with the flicker's touches: taps (ring + dot) and swipes (trails), live and fading. */
+    @Test
+    fun overlayTouches() {
+        val ctx = RuntimeEnvironment.getApplication()
+        Raden.apply(ctx)
+        val w = 2560; val h = 1600
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(0xFF2A2340.toInt()) // stand-in for the game
+        val l = Prefs.load(ctx, 0)
+        LayoutPainter(ctx).draw(c, w.toFloat(), h.toFloat(), l)
+        val tr = org.json.JSONArray()
+        var seq = 0
+        fun ev(id: Int, x: Float, y: Float, k: Int) = tr.put(org.json.JSONArray().put(++seq).put(id).put(x.toDouble()).put(y.toDouble()).put(k))
+        val t = l.taps
+        // 1: tap being held right now
+        t.getOrNull(0)?.let { ev(1, it.fx * w, it.fy * h, 0) }
+        // 2: tap that just lifted (fading)
+        t.getOrNull(1)?.let { ev(2, it.fx * w, it.fy * h, 0); ev(2, it.fx * w, it.fy * h, 2) }
+        // 3: right-stick flick mid-swipe
+        val rx = l.rfx * w; val ry = l.rfy * h
+        ev(3, rx, ry, 0); for (i in 1..8) ev(3, rx + i * 28f, ry - i * 22f, 1)
+        // 4: left-stick flick finished a moment ago (fading)
+        val lx = l.lfx * w; val ly = l.lfy * h
+        ev(4, lx, ly, 0); for (i in 1..8) ev(4, lx - i * 30f, ly + i * 6f, 1); ev(4, lx - 240f, ly + 48f, 2)
+        val trails = TouchTrails()
+        val now = 100_000L
+        trails.read(org.json.JSONArray(), now) // overlay just opened
+        trails.read(tr, now)
+        trails.age(1, 120, -1, now)
+        trails.age(2, 300, 250, now)
+        trails.age(3, 200, -1, now)
+        trails.age(4, 600, 500, now)
+        trails.draw(c, 0f, 0f, 2f, now)
+        File(out, "8-overlay-touches.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     @Test fun editorLive() = editor(0, "3-editor-live")
     @Test fun editorPark() = editor(1, "4-editor-park")
 

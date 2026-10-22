@@ -50,6 +50,23 @@ class TouchInjector {
     @Synchronized
     fun count(): Int = active.size
 
+    // Recent touch points for the overlay's tap / swipe trails: [seq, stroke, x, y, kind(0 down,1 move,2 up)]
+    private val log = ArrayDeque<FloatArray>()
+    private val strokeOf = HashMap<Int, Int>()
+    private var seq = 0
+    private var strokes = 0
+
+    private fun record(id: Int, x: Float, y: Float, kind: Int) {
+        if (kind == 0) strokeOf[id] = ++strokes
+        val st = strokeOf[id] ?: return
+        log.addLast(floatArrayOf((++seq).toFloat(), st.toFloat(), x, y, kind.toFloat()))
+        while (log.size > 160) log.removeFirst()
+    }
+
+    /** Recently logged touch points, oldest first. */
+    @Synchronized
+    fun trace(): List<FloatArray> = log.toList()
+
     @Synchronized
     fun down(x: Float, y: Float): Int {
         var id = 0
@@ -57,6 +74,7 @@ class TouchInjector {
         val now = SystemClock.uptimeMillis()
         if (active.isEmpty()) downTime = now
         active[id] = floatArrayOf(x, y)
+        record(id, x, y, 0)
         val action = if (active.size == 1) {
             MotionEvent.ACTION_DOWN
         } else {
@@ -73,6 +91,7 @@ class TouchInjector {
         if (p[0] == x && p[1] == y) return
         p[0] = x
         p[1] = y
+        record(id, x, y, 1)
         send(MotionEvent.ACTION_MOVE, SystemClock.uptimeMillis())
     }
 
@@ -86,6 +105,7 @@ class TouchInjector {
             MotionEvent.ACTION_POINTER_UP or (idx shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
         }
         send(action, SystemClock.uptimeMillis())
+        active[id]?.let { record(id, it[0], it[1], 2) }
         active.remove(id)
     }
 

@@ -48,6 +48,9 @@ class OverlayService : Service() {
     private var bannerUntil = 0L
     private val layouts = HashMap<Int, Prefs.Layout>()
 
+    // Injected touches, drawn as dots + trails while the overlay is on (like the controller test screen)
+    private val touches = TouchTrails()
+
     // in-game editor
     private var editor: Editor? = null
     private var lastKeySeen = ""
@@ -103,11 +106,12 @@ class OverlayService : Service() {
                         lastKeySeen = lk
                     }
                     editor?.onPoll(pressedNow)
+                    touches.read(o.optJSONArray("trace"), SystemClock.uptimeMillis())
                 }
             } catch (_: Throwable) {
             }
             refresh()
-            handler.postDelayed(this, 80)
+            handler.postDelayed(this, if (overlayOn) 33 else 80)
         }
     }
 
@@ -426,6 +430,7 @@ class OverlayService : Service() {
             val w = width.toFloat()
             val h = height.toFloat()
             if (overlayOn) painter.draw(c, w, h, layoutFor(modeIdx))
+            if (overlayOn) drawTouches(c)
             val showBanner = SystemClock.uptimeMillis() < bannerUntil
             if (showBanner || overlayOn) {
                 val label = if (showBanner) "$modeName mode" else modeName
@@ -437,6 +442,14 @@ class OverlayService : Service() {
                 c.drawText(label, w / 2, r.centerY() + bannerTxt.textSize * 0.35f, bannerTxt)
             }
             if (showBanner) postInvalidateDelayed(100)
+        }
+
+        private val loc = IntArray(2)
+
+        private fun drawTouches(c: Canvas) {
+            getLocationOnScreen(loc) // injected touches are in screen coordinates
+            if (touches.draw(c, -loc[0].toFloat(), -loc[1].toFloat(), resources.displayMetrics.density, SystemClock.uptimeMillis()))
+                postInvalidateDelayed(16)
         }
     }
 }

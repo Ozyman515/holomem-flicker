@@ -208,6 +208,11 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("editing", editing)
         o.put("lastKey", lastKey)
         o.put("running", status.startsWith("Running"))
+        if (overlayOn) inj?.let { i ->
+            val tr = JSONArray()
+            for (e in i.trace()) tr.put(JSONArray().put(e[0].toInt()).put(e[1].toInt()).put(e[2].toDouble()).put(e[3].toDouble()).put(e[4].toInt()))
+            o.put("trace", tr)
+        }
         return o.toString()
     }
 
