@@ -22,3 +22,10 @@ Runs through [Shizuku](https://shizuku.rikka.app/), which gives it shell-level a
 4. Turn the Lenovo key mapper off (or use an empty profile) while playing songs.
 
 Every push to `main` builds a new signed APK into Releases. Build logs go to the `ci-log` branch.
+
+## License
+Copyright (C) 2026 Ozyman515
+
+Holomem Flicker is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License v3.0](LICENSE) as published by the Free Software Foundation.
+It is distributed WITHOUT ANY WARRANTY; see the license and the in-app disclaimer for details.

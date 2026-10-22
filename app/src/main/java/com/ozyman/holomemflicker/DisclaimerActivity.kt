@@ -67,6 +67,11 @@ class DisclaimerActivity : Activity() {
                 "The app stores your layouts and settings only on your device. It connects to the internet only to " +
                     "check GitHub for signed updates and download them."
             ),
+            "License" to listOf(
+                "Holomem Flicker is free software released under the GNU General Public License v3.0 (GPL-3.0). You can " +
+                    "use, change and share it under those terms. If you share a changed version, it must also be released " +
+                    "under GPL-3.0 with its source code. Full license: github.com/Ozyman515/holomem-flicker/blob/main/LICENSE"
+            ),
             "Changes" to listOf(
                 "This disclaimer may be updated in future versions. By installing or continuing to use the app, you " +
                     "accept these terms. If you don't agree, uninstall it."
