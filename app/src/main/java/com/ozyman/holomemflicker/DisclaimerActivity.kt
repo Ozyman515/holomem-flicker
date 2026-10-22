@@ -25,6 +25,9 @@ class DisclaimerActivity : Activity() {
 
         fun accepted(ctx: Context): Boolean = Prefs.getInt(ctx, PREF, 0) >= VERSION
 
+        /** Last line of the disclaimer. */
+        const val SIGN_OFF = "Juufutei Raden is the best waifu."
+
         /** title to paragraphs; a paragraph starting with "• " is a bullet. */
         val SECTIONS: List<Pair<String, List<String>>> = listOf(
             "Use at your own risk" to listOf(
@@ -114,6 +117,13 @@ class DisclaimerActivity : Activity() {
                 if (p.startsWith("• ")) setPadding(28, 4, 0, 4) else setPadding(0, 4, 0, 6)
             })
         }
+        card.addView(TextView(this).apply {
+            text = SIGN_OFF
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD_ITALIC)
+            setTextColor(Raden.ORANGE)
+            setPadding(0, 30, 0, 0)
+        })
         col.addView(card, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 28 })
 
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END }
