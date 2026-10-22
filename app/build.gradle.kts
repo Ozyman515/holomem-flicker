@@ -3,7 +3,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+// The release number lives in version.txt and only goes up when an update is published.
+val appVersion = rootProject.file("version.txt").readText().trim().toInt()
 
 android {
     namespace = "com.ozyman.holomemflicker"
@@ -13,8 +14,8 @@ android {
         applicationId = "com.ozyman.holomemflicker"
         minSdk = 30
         targetSdk = 34
-        versionCode = runNumber
-        versionName = "0.1.$runNumber"
+        versionCode = appVersion
+        versionName = "0.1.$appVersion"
     }
 
     signingConfigs {

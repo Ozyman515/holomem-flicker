@@ -1,11 +1,11 @@
 name: Build APK
 
 on:
+  # Releases only: builds when version.txt changes on main (or by hand). Ordinary pushes don't make a new version.
   push:
     branches: [main]
-    paths-ignore:
-      - "update/**"
-      - "tools/SIGNING.md"
+    paths:
+      - "version.txt"
   workflow_dispatch:
 
 permissions:
@@ -42,10 +42,13 @@ jobs:
       - name: Build
         env:
           KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -o pipefail
           gradle --no-daemon --stacktrace assembleRelease 2>&1 | tee build.log
-          N=${{ github.run_number }}
+          N=$(tr -d '[:space:]' < version.txt)
+          echo "N=$N" >> "$GITHUB_ENV"
+          if gh release view "v$N" >/dev/null 2>&1; then echo "::error::v$N already exists - bump version.txt"; exit 1; fi
           cp app/build/outputs/apk/release/app-release.apk holomem-flicker-v$N.apk
           SHA=$(sha256sum holomem-flicker-v$N.apk | cut -d' ' -f1)
           SIZE=$(stat -c %s holomem-flicker-v$N.apk)
@@ -55,11 +58,11 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: Holomem Flicker v${{ github.run_number }}
+          tag_name: v${{ env.N }}
+          name: Holomem Flicker v${{ env.N }}
           body: "Not offered to the app until release.json is signed with the offline key (see tools/SIGNING.md). Commit: ${{ github.sha }}"
           files: |
-            holomem-flicker-v${{ github.run_number }}.apk
+            holomem-flicker-v${{ env.N }}.apk
             release.json
 
       - name: Save build log to ci-log branch
@@ -70,7 +73,7 @@ jobs:
           git config user.email "ci@users.noreply.github.com"
           git switch --orphan ci-log-tmp
           cp /tmp/build.log build.log
-          echo "run ${{ github.run_number }} result: ${{ job.status }}" > status.txt
+          echo "v${N:-?} (run ${{ github.run_number }}) result: ${{ job.status }}" > status.txt
           git add build.log status.txt
-          git commit -q -m "build log run ${{ github.run_number }}"
+          git commit -q -m "build log v${N:-?}"
           git push -f origin HEAD:ci-log

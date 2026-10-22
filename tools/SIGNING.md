@@ -5,8 +5,10 @@ The app only installs a release if `update/release.json` is signed by the owner'
 compiled into the app (`UpdateVerifier.kt`). The private key is never committed.
 
 ## Releasing
-1. Push to `main`. GitHub Actions builds `holomem-flicker-vN.apk` and attaches `release.json`
-   (version, APK link, SHA-256) to the vN release. Nothing is offered to the app yet.
+1. Test changes on a `screens/...` branch (screenshots + unit tests, no version change). Merge to `main` freely.
+   To publish an update, raise the number in `version.txt` by one and push it to `main`: only then does
+   GitHub Actions build `holomem-flicker-vN.apk` and attach `release.json` (version, APK link, SHA-256)
+   to the vN release. Nothing is offered to the app yet.
 2. Download that `release.json` into `update/release.json`.
 3. Sign it (Godot 4, same as lofi-room):
    `godot --headless -s tools/sign_release.gd -- /safe/place/update_key.pem update/release.json tools/update_key.pub`
