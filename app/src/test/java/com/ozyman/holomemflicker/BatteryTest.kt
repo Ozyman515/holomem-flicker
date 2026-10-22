@@ -40,6 +40,41 @@ class BatteryTest {
         e.shutdown()
     }
 
+    /** v14 bug: Select+L1 only showed up on the overlay's 5 s fallback. It must wake it at once. */
+    @Test
+    fun selectL1WakesTheOverlayImmediately() {
+        val e = engine()
+        val sel = 0x13a; val l1 = 0x136
+        for ((on, label) in listOf(true to "show", false to "hide")) {
+            val seq = JSONObject(e.stateJson()).getLong("seq")
+            Thread {
+                Thread.sleep(100)
+                e.feedKeyForTest(sel, 1); e.feedKeyForTest(l1, 1)
+                e.feedKeyForTest(l1, 0); e.feedKeyForTest(sel, 0)
+            }.start()
+            val start = System.nanoTime()
+            e.waitChange(seq, 5_000)
+            val took = (System.nanoTime() - start) / 1_000_000
+            assertTrue("$label took $took ms (should be immediate)", took < 1_000)
+            Thread.sleep(50)
+            assertEquals(on, JSONObject(e.stateJson()).getBoolean("overlay"))
+        }
+        e.shutdown()
+    }
+
+    /** Any press (e.g. an editor assignment) reaches the overlay at once, not after the timeout. */
+    @Test
+    fun plainButtonPressWakesTheOverlay() {
+        val e = engine()
+        val seq = JSONObject(e.stateJson()).getLong("seq")
+        Thread { Thread.sleep(100); e.feedKeyForTest(0x130, 1) }.start()
+        val start = System.nanoTime()
+        e.waitChange(seq, 5_000)
+        assertTrue((System.nanoTime() - start) / 1_000_000 < 1_000)
+        assertTrue(JSONObject(e.stateJson()).getString("lastKey").endsWith(":304"))
+        e.shutdown()
+    }
+
     @Test
     fun overlayToggleAndModeChangeWakeTheOverlay() {
         val e = engine()

@@ -395,7 +395,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         if (type == 1) nKeys++
         if (isActivity(r, type, code, value)) markActive()
         when (type) {
-            1 -> key(injector, r, code, value)
+            1 -> onKey(injector, r.dev.path, code, value)
             3 -> { // EV_ABS
                 r.raw[code] = value
                 active = r
@@ -464,14 +464,32 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         ticker = null
     }
 
-    private fun key(injector: TouchInjector, r: Reader, code: Int, value: Int) {
+    /**
+     * Every real press / release goes through here and wakes the overlay right away
+     * (Select+L1 overlay, editor assignments, pressed-key display) - not on the next timeout.
+     */
+    private fun onKey(injector: TouchInjector?, src: String, code: Int, value: Int) {
+        if (value == 2) return // auto-repeat
+        key(injector, src, code, value)
+        bump()
+    }
+
+    /** For tests: a controller button event exactly as the device reader delivers it (no touch injector). */
+    fun feedKeyForTest(code: Int, value: Int) {
+        synchronized(this) {
+            if (value == 1) markActive()
+            onKey(inj, "test", code, value)
+        }
+    }
+
+    private fun key(injector: TouchInjector?, src: String, code: Int, value: Int) {
         if (value == 2) return
         if (value == 1) pressed.add(code) else pressed.remove(code)
         if (value == 1) {
             keySeq++
             lastKey = "$keySeq:$code"
         }
-        note("${r.dev.path} button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
+        note("$src button 0x%03x %s".format(code, if (value == 1) "down" else "up"))
 
         // ---- modifier / combos ----
         if (code == modKey) {
@@ -480,7 +498,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                 comboUsed = false
             } else {
                 modHeld = false
-                if (!comboUsed && !editing) quickTap(injector, code) // Select alone = its own tap
+                if (!comboUsed && !editing && injector != null) quickTap(injector, code) // Select alone = its own tap
             }
             return
         }
@@ -501,7 +519,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             return
         }
         if (value == 0 && suppressed.remove(code)) return
-        if (editing) return
+        if (editing || injector == null) return
 
         // ---- normal taps ----
         for (t in mode.taps) {
