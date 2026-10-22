@@ -10,7 +10,7 @@ import java.security.spec.X509EncodedKeySpec
 /**
  * Signed updates. A release is only trusted if update/release.json carries a valid
  * signature (update/release.json.sig) from the owner's offline release key
- * (holomem-flicker-update-key.pem, used only by this app - since v16; v15 and earlier trusted the lofi-room key). Only the PUBLIC half lives here; a hijacked
+ * (holomem-flicker-update-key.pem, used only by this app - since v17; v15 and earlier trusted the lofi-room key). Only the PUBLIC half lives here; a hijacked
  * GitHub account can publish files but can't sign them.
  */
 object UpdateVerifier {
