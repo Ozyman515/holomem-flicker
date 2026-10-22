@@ -16,10 +16,13 @@ Built with Claude (Anthropic's AI): the code, screens and disclaimer were writte
 Runs through [Shizuku](https://shizuku.rikka.app/), which gives it shell-level access to read the controller and inject touches. No root needed.
 
 ## Install
-1. Install Shizuku from the Play Store and start it through **Wireless debugging** (redo this after each reboot).
-2. Download the newest `holomem-flicker-vN.apk` from **Releases** and install it.
-3. Open Holomem Flicker, tap **Grant Shizuku access**, then **Start flicker**.
-4. Turn the Lenovo key mapper off (or use an empty profile) while playing songs.
+**Full step-by-step guide: [docs/SETUP.md](docs/SETUP.md)** (Shizuku, first start, modes, editor, tuning, updates, troubleshooting).
+
+Quick version:
+1. Install Shizuku and start it through **Wireless debugging** (redo the Start after each reboot).
+2. Download the newest `holomem-flicker-vN.apk` from **Releases** and install it; accept the disclaimer.
+3. Tap **Grant Shizuku access**, then **Start flicker**.
+4. Turn the Lenovo key mapper off (or let the app stop it) while playing songs.
 
 A new version is built into Releases only when `version.txt` is raised on `main`, and the app offers it once its manifest is signed (see `tools/SIGNING.md`). Build logs go to the `ci-log` branch.
 
