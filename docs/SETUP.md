@@ -56,10 +56,21 @@ turn **Wireless debugging** on (with Wi-Fi connected), open Shizuku, tap **Start
 
 ## 3. Install Holomem Flicker
 
-1. On your device, open the project's **[Releases page](https://github.com/Ozyman515/holomem-flicker/releases)** and download the newest
-   `holomem-flicker-vN.apk` that has a signed manifest (the app tells you which is current once installed).
-2. Open the downloaded file. Android will ask you to allow your browser or Files app to **install unknown apps** – allow it, then tap **Install**.
-3. Open **Holomem Flicker**. The **disclaimer** appears first; read it and tap **I understand and accept** (or **Close app** if you don't agree).
+1. Open **[update/release.json](https://github.com/Ozyman515/holomem-flicker/blob/main/update/release.json)** in the repository.
+   It names the current version and its APK's SHA-256 fingerprint, and it is signed with the project's offline key
+   (`release.json.sig` next to it), so it's the one source of truth for which release is real.
+2. Download that version's `holomem-flicker-vN.apk` from the **[Releases page](https://github.com/Ozyman515/holomem-flicker/releases)**.
+   Ignore any other builds listed there.
+3. **Check the file before installing** (the one time the app can't do it for you). On a PC:
+   Windows `certutil -hashfile holomem-flicker-vN.apk SHA256`, macOS/Linux `sha256sum holomem-flicker-vN.apk`.
+   The result must match `sha256` in release.json exactly. If it doesn't, don't install it.
+4. Open the downloaded file. Android will ask you to allow your browser or Files app to **install unknown apps** – allow it, then tap **Install**.
+5. Open **Holomem Flicker**. The **disclaimer** appears first; read it and tap **I understand and accept** (or **Close app** if you don't agree).
+
+From then on, let the app update itself (section 11): every update is checked against the signed manifest automatically.
+The app's signing certificate (SHA-256) is
+`6D:38:1A:00:EF:63:81:C5:C0:FA:BF:1B:47:13:53:4A:EA:50:B7:63:F7:04:E3:A9:04:47:97:80:4A:9A:6A:55`;
+Android refuses any update signed with a different certificate.
 
 ![Main screen](img/main.jpg)
 

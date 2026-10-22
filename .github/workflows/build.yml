@@ -15,17 +15,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Workflow safety check (nothing may run on issues / PRs)
         run: bash tools/check-workflows.sh
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
         with:
           gradle-version: "8.9"
 
@@ -58,15 +58,21 @@ jobs:
           printf '{\n  "version": %s,\n  "apk": "https://github.com/Ozyman515/holomem-flicker/releases/download/v%s/holomem-flicker-v%s.apk",\n  "sha256": "%s",\n  "size": %s\n}\n' "$N" "$N" "$N" "$SHA" "$SIZE" > release.json
           cat release.json
 
+      - name: Remove the keystore (nothing after the build may see it)
+        if: always()
+        run: |
+          if [ -n "${KEYSTORE_PATH:-}" ] && [ -f "$KEYSTORE_PATH" ]; then shred -u "$KEYSTORE_PATH" || rm -f "$KEYSTORE_PATH"; fi
+          echo "KEYSTORE_PATH=" >> "$GITHUB_ENV"
+
+      # Published with GitHub's own CLI (preinstalled on the runner) - no third-party action touches the build.
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.N }}
-          name: Holomem Flicker v${{ env.N }}
-          body: "Not offered to the app until release.json is signed with the offline key (see tools/SIGNING.md). Commit: ${{ github.sha }}"
-          files: |
-            holomem-flicker-v${{ env.N }}.apk
-            release.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$N" \
+            --title "Holomem Flicker v$N" \
+            --notes "Not offered to the app until release.json is signed with the offline key (see tools/SIGNING.md). Commit: ${{ github.sha }}" \
+            "holomem-flicker-v$N.apk" release.json
 
       - name: Save build log to ci-log branch
         if: always()
