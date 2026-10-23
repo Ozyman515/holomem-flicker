@@ -18,7 +18,7 @@ import kotlin.math.min
  *  - sticks, per mode:
  *      flick    : finger down at the base (shifted sideways by push direction), follows the stick
  *      joystick : same, without the sideways shift - a virtual joystick for walking
- *      camera   : continuous swipe from an anchor while the stick is held (re-anchors at the edge)
+ *      camera   : continuous swipe from an anchor while the stick is held (re-anchors at the edge, see CameraSwipe)
  *      off
  *  - combos: hold the MODIFIER (Select). Select+L1 = overlay on/off, Select+R1 = next mode.
  *    Buttons pressed while Select is held never tap. Select alone taps (on release) if mapped.
@@ -58,6 +58,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         var dirX = 0f
         var dirY = 0f
         var upAt = 0L
+        /** camera sticks: the swipe state (see CameraSwipe) */
+        var cam: CameraSwipe? = null
     }
 
     private class Mode(val name: String, val taps: List<Tap>, val stickCfg: List<JSONObject>) {
@@ -306,7 +308,10 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private fun releaseMode() {
         val injector = inj ?: return
         for (t in mode.taps) if (t.pid >= 0) { injector.up(t.pid); t.pid = -1 }
-        for (s in mode.sticks) if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
+        for (s in mode.sticks) {
+            if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
+            s.cam?.reset()
+        }
     }
 
     fun monitorText(): String {
@@ -596,33 +601,19 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     if (s.type != "camera") continue
                     val x = a.norm(s.ax)
                     val y = a.norm(s.ay)
-                    val mag = hypot(x, y)
-                    if (s.pid < 0) {
-                        if (mag >= s.dead) {
-                            s.px = s.bx
-                            s.py = s.by
-                            s.pid = injector.down(s.px, s.py)
-                        }
-                    } else if (mag < s.dead * 0.6f) {
-                        injector.up(s.pid)
-                        s.pid = -1
-                    } else {
-                        // radius = pixels per tick at full tilt
-                        s.px = (s.px + x * s.radius).coerceIn(1f, screenW - 1f)
-                        s.py = (s.py + y * s.radius).coerceIn(1f, screenH - 1f)
-                        injector.move(s.pid, s.px, s.py)
-                        val maxDrag = screenW * 0.18f
-                        if (hypot(s.px - s.bx, s.py - s.by) > maxDrag) {
-                            // lift and re-anchor so the swipe can keep going
-                            injector.up(s.pid)
-                            s.px = s.bx
-                            s.py = s.by
-                            s.pid = injector.down(s.px, s.py)
-                        }
+                    val cam = s.cam ?: CameraSwipe(s.bx, s.by, screenW, screenH, s.radius, s.dead).also { s.cam = it }
+                    if (!cam.down && s.pid >= 0) { injector.up(s.pid); s.pid = -1 } // out of sync: start clean
+                    when (val op = cam.step(x, y, System.currentTimeMillis())) {
+                        is CameraSwipe.Op.Down -> s.pid = injector.down(op.x, op.y)
+                        is CameraSwipe.Op.Move -> if (s.pid >= 0) injector.move(s.pid, op.x, op.y)
+                        CameraSwipe.Op.Up -> if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
+                        null -> {}
                     }
                 }
                 // no camera finger down any more: let the CPU rest until the next push
-                if (mode.sticks.none { it.type == "camera" && it.pid >= 0 }) stopTicker()
+                // (a camera stick waiting to touch down again after a re-anchor still counts)
+                val now = System.currentTimeMillis()
+                if (mode.sticks.none { it.type == "camera" && (it.pid >= 0 || it.cam?.busy(now) == true) }) stopTicker()
             }
         } catch (_: Throwable) {
         }
