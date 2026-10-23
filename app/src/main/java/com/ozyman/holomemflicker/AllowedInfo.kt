@@ -55,10 +55,10 @@ object AllowedInfo {
         "Best Regards,\nJenny\nhololive Dreams Customer Support Team"
     )
 
-    const val NOTE = "In short: controllers aren't officially supported and they won't give technical support for them, " +
+    const val NOTE = "How Claude (the AI that built this app) and the project owner read this: controllers aren't officially supported and they won't give technical support for them, " +
         "but they didn't call mapping tools a violation. Holomem Flicker turns your own button presses into touches - " +
         "it never plays by itself (no bots, no macros). Read the Terms of Service and decide for yourself; " +
-        "see the Disclaimer for the full terms of use."
+        "see the Disclaimer for the full terms of use. This is our reading, not an official answer from QualiArts."
 
     /** The pop-up's content (also rendered by the screenshot test). */
     fun view(ctx: Context, onClose: () -> Unit): View {
