@@ -25,6 +25,8 @@ class DisclaimerActivity : Activity() {
 
         fun accepted(ctx: Context): Boolean = Prefs.getInt(ctx, PREF, 0) >= VERSION
 
+        const val GAME_RULES = "Game rules are your responsibility"
+
         /** Last line of the disclaimer. */
         const val SIGN_OFF = "Juufutei Raden is the best waifu."
 
@@ -48,7 +50,7 @@ class DisclaimerActivity : Activity() {
                 "• missed inputs, wrong inputs or poor game performance;",
                 "• any direct, indirect, incidental, special or consequential damages, even if advised of the possibility of such damages."
             ),
-            "Game rules are your responsibility" to listOf(
+            GAME_RULES to listOf(
                 "Tools that map controller input to touch may break the terms of service of some games. It's up to you " +
                     "to check and follow the rules of any game you use it with. The developer(s) are not responsible for " +
                     "any action a game publisher takes against your account."
@@ -126,6 +128,13 @@ class DisclaimerActivity : Activity() {
                 setLineSpacing(0f, 1.15f)
                 if (p.startsWith("• ")) setPadding(28, 4, 0, 4) else setPadding(0, 4, 0, 6)
             })
+            // readable before accepting: what hololive Dreams support told us
+            if (title == GAME_RULES) card.addView(Button(this).apply {
+                text = "❓  ${AllowedInfo.TITLE}  (what hololive Dreams support told us)"
+                textSize = 14f
+                Raden.pill(this, Raden.ORANGE, Raden.CREAM)
+                setOnClickListener { AllowedInfo.show(this@DisclaimerActivity) }
+            }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 10; bottomMargin = 6 })
         }
         card.addView(TextView(this).apply {
             text = SIGN_OFF

@@ -35,6 +35,12 @@ class ScreensTest {
         File(out, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    private fun findButton(v: View, text: String): android.widget.Button? = when {
+        v is android.widget.Button && v.text.contains(text) -> v
+        v is ViewGroup -> (0 until v.childCount).firstNotNullOfOrNull { findButton(v.getChildAt(it), text) }
+        else -> null
+    }
+
     private fun content(a: Activity): View =
         (a.findViewById<ViewGroup>(android.R.id.content)).getChildAt(0)
 
@@ -67,6 +73,9 @@ class ScreensTest {
         val inner = scroll.getChildAt(0)
         scroll.removeView(inner)
         save(android.widget.FrameLayout(a).apply { setBackgroundColor(Raden.MINT); addView(inner) }, "11-disclaimer", 2560)
+        // the "Is this allowed?" pop-up is reachable before accepting
+        val b = findButton(inner, AllowedInfo.TITLE)
+        org.junit.Assert.assertNotNull("disclaimer must link to the support reply", b)
     }
 
     /** "Is this allowed?" pop-up: our question and support's reply. */
