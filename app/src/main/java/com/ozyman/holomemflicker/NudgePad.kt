@@ -103,6 +103,18 @@ class NudgePad(ctx: Context, private val onNudge: (dxPx: Int, dyPx: Int) -> Unit
         const val REPEAT_MS = 50L
 
         /**
+         * Size −/+ step for a tap circle. Up to v19 one tap was ×1.2; now it's half that step
+         * (√1.2 ≈ ×1.095), so two taps land exactly where one tap used to (1 → 3 → 5 instead of 1 → 5).
+         */
+        val SIZE_STEP = Math.sqrt(1.2).toFloat()
+        const val MIN_FR = 0.008f
+        const val MAX_FR = 0.15f
+
+        /** New circle radius (share of screen width) after one Size tap in direction [dir]. */
+        fun resized(fr: Float, dir: Int): Float =
+            (fr * if (dir > 0) SIZE_STEP else 1 / SIZE_STEP).coerceIn(MIN_FR, MAX_FR)
+
+        /**
          * Moves the selected marker of [d] by (dxPx, dyPx) on a [w]×[h] board.
          * [sel]: tap index, -1 left stick, -2 right stick. Returns a short position read-out, or null if nothing is selected.
          */

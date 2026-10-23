@@ -221,7 +221,7 @@ class CalibrateActivity : Activity() {
             say("Tap a tap point first, then use Size − / Size + to change its circle.")
             return
         }
-        t.fr = (t.fr * if (dir > 0) 1.2f else 1 / 1.2f).coerceIn(0.008f, 0.15f)
+        t.fr = NudgePad.resized(t.fr, dir)
         say("${Prefs.buttonName(t.code)} circle: %.1f%% of screen width. Presses land randomly inside it.".format(t.fr * 100))
     }
 

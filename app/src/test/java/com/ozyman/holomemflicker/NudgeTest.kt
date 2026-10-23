@@ -60,4 +60,17 @@ class NudgeTest {
         assertEquals(0f, d.taps[0].fx, 0f)
         assertNull(NudgePad.apply(d, Int.MIN_VALUE, 2, 0, w, h))
     }
+
+    /** v20: Size −/+ moves in half steps - two taps now equal one old tap (×1.2). */
+    @Test
+    fun sizeStepIsHalfTheOldOne() {
+        val start = 0.03f
+        val one = NudgePad.resized(start, +1)
+        val two = NudgePad.resized(one, +1)
+        assertTrue("one tap grows less than before ($one)", one > start && one < start * 1.2f)
+        assertEquals(start * 1.2f, two, 1e-5f)
+        assertEquals(start, NudgePad.resized(NudgePad.resized(two, -1), -1), 1e-5f)
+        assertEquals(NudgePad.MAX_FR, NudgePad.resized(0.149f, +1), 0f)
+        assertEquals(NudgePad.MIN_FR, NudgePad.resized(0.0081f, -1), 0f)
+    }
 }
