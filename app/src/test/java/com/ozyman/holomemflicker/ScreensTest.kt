@@ -69,6 +69,19 @@ class ScreensTest {
         save(android.widget.FrameLayout(a).apply { setBackgroundColor(Raden.MINT); addView(inner) }, "11-disclaimer", 2560)
     }
 
+    /** "Is this allowed?" pop-up: our question and support's reply. */
+    @Test
+    fun allowed() {
+        val ctx = RuntimeEnvironment.getApplication()
+        Raden.apply(ctx)
+        val pop = AllowedInfo.view(ctx) {}
+        val inner = (pop as ScrollView).getChildAt(0); pop.removeView(inner)
+        save(android.widget.FrameLayout(ctx).apply {
+            setBackgroundColor(Raden.alpha(Raden.NIGHT, 0xCC)); setPadding(160, 60, 160, 60); addView(inner)
+        }, "12-is-this-allowed", 1600)
+        org.junit.Assert.assertTrue(AllowedInfo.ANSWER.any { it.contains("use your own judgment") })
+    }
+
     /** Not accepted yet: opening the app goes straight to the disclaimer; accepting lets you in. */
     @Test
     fun disclaimerGate() {

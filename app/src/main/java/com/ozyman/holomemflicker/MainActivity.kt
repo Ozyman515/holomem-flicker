@@ -143,6 +143,14 @@ class MainActivity : Activity() {
             setTypeface(typeface, Typeface.ITALIC)
             setTextColor(Raden.CREAM)
         })
+        // highlighted "Is this allowed?" chip: opens the support Q&A pop-up
+        header.addView(Button(this).apply {
+            text = "❓  ${AllowedInfo.TITLE}"
+            textSize = 14f
+            Raden.pill(this, Raden.ORANGE, Raden.CREAM)
+            setPadding(30, 10, 30, 10)
+            setOnClickListener { AllowedInfo.show(this@MainActivity) }
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = 10; bottomMargin = 8 })
         header.addView(TextView(this).apply {
             text = "${Raden.current.name} theme  ·  v${BuildConfig.VERSION_CODE}"
             textSize = 15f
