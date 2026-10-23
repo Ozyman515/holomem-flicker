@@ -80,6 +80,7 @@ class ScreensTest {
             setBackgroundColor(Raden.alpha(Raden.NIGHT, 0xCC)); setPadding(160, 60, 160, 60); addView(inner)
         }, "12-is-this-allowed", 1600)
         org.junit.Assert.assertTrue(AllowedInfo.ANSWER.any { it.contains("use your own judgment") })
+        org.junit.Assert.assertTrue(AllowedInfo.QUESTION.any { it.contains("leaderboard scores") })
     }
 
     /** Not accepted yet: opening the app goes straight to the disclaimer; accepting lets you in. */

@@ -23,7 +23,19 @@ object AllowedInfo {
     const val SENT_ON = "Sent through the in-game Feedback form on October 22, 2026"
 
     /** The (shortened) message we sent. */
-    const val QUESTION = "QUESTION_TEXT_PENDING"
+    val QUESTION = listOf(
+        "Hello, I'd like to confirm something is allowed before sharing it with other players.",
+        "I made a free, unofficial fan app for Android that lets a game controller (e.g. Razer Kishi) act as touch input:\n" +
+            "- Each button press or stick movement makes a touch at a set spot, only at the moment I press it.\n" +
+            "- No auto-play, turbo or timing help. It doesn't read, change or connect to the game's files, memory or servers.\n" +
+            "- One button can touch more than one spot at once (e.g. both sides of a long note).\n" +
+            "It works like the key mappers built into some gaming tablets (e.g. Lenovo Legion).",
+        "Questions:\n" +
+            "1. Is using a controller mapper like this allowed on mobile, including for leaderboard scores?\n" +
+            "2. Is one button triggering more than one touch at the same time allowed?\n" +
+            "3. Would publishing it for free for other players break the Terms of Service?",
+        "I'm happy to change or not publish it based on your answer. Thank you!"
+    )
 
     const val REPLIED_ON = "Reply from hololive Dreams Customer Support (Jenny), October 2026"
 
@@ -84,7 +96,7 @@ object AllowedInfo {
         }
 
         label("What we asked", SENT_ON)
-        quote(listOf(QUESTION), Raden.TEAL)
+        quote(QUESTION, Raden.TEAL)
         label("What they answered", REPLIED_ON)
         quote(ANSWER, Raden.ORANGE)
         col.addView(TextView(ctx).apply {
