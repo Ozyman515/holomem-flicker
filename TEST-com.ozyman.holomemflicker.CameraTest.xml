@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.CameraTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-23T13:19:42" hostname="runnervm8k3b6" time="0.006">
+  <properties/>
+  <testcase name="releasingTheStickLiftsAndStopsCleanly" classname="com.ozyman.holomemflicker.CameraTest" time="0.003"/>
+  <testcase name="releasingDuringTheGapDoesNotTouchAgain" classname="com.ozyman.holomemflicker.CameraTest" time="0.0"/>
+  <testcase name="neverTouchesDownInTheSameInstantItLifted" classname="com.ozyman.holomemflicker.CameraTest" time="0.0"/>
+  <testcase name="reAnchorsBehindTheAnchorSoSwipesLastLonger" classname="com.ozyman.holomemflicker.CameraTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
