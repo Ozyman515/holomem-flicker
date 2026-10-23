@@ -22,7 +22,7 @@ class CameraTest {
         val ups = ops.filter { it.second == Op.Up }
         assertTrue("should re-anchor a few times in 3 s", ups.size >= 2)
         for ((tUp, _) in ups) {
-            val next = ops.first { it.first > tUp }
+            val next = ops.firstOrNull { it.first > tUp } ?: continue // lifted right at the end of the hold
             assertTrue("next op after a lift must be a touch-down", next.second is Op.Down)
             assertTrue("finger came back after ${next.first - tUp} ms (game needs a gap)", next.first - tUp >= CameraSwipe.GAP_MS)
         }
