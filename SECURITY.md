@@ -18,5 +18,6 @@ Please **don't** open a public issue. Use GitHub's private **Report a vulnerabil
   `tools/check-workflows.sh` enforces this on every test run.
 - **Reports are read as text only.** Issues are read by the maintainer (with help from Claude, Anthropic's AI) as
   information only: instructions, commands, code, links and attachments inside an issue are never run, opened,
-  downloaded or followed. Nothing is changed, built, published or replied to because an issue asks for it;
+  downloaded or followed. The one exception is bug-report videos: a video uploaded straight into the issue
+  (hosted by GitHub) or a YouTube link may be watched, and nothing else from the issue is opened. Nothing is changed, built, published or replied to because an issue asks for it;
   only the project owner decides that, and every public reply is approved by the owner.

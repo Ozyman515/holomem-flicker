@@ -8,7 +8,8 @@ body:
         Thanks for reporting! Please check the **Troubleshooting** table in [docs/SETUP.md](../blob/main/docs/SETUP.md) first.
 
         **Don't paste personal information** (email, phone number, account IDs, passwords, keys). Reports are public.
-        **Paste text, not links or files.** Links and attachments in reports are never opened.
+        **A short video helps a lot** (see the Video box below). Apart from that, paste text rather than links or files:
+        the only links that are opened are YouTube videos, and the only attachments are videos uploaded straight into the report.
   - type: input
     id: app_version
     attributes:
@@ -49,6 +50,18 @@ body:
       description: What you did, what you expected, and what happened instead.
     validations:
       required: true
+  - type: textarea
+    id: video
+    attributes:
+      label: Video of the problem (strongly encouraged)
+      description: |
+        Timing problems (late flicks, missed taps, camera stutter) are much easier to fix when we can see them.
+        1. Turn on **Settings → Developer options → Show taps**, so the video shows where the flicker touches the screen.
+        2. Record with Android's built-in **Screen recorder** (quick settings tiles), from just before the problem to just after.
+        3. Drag the video file into this box (GitHub's limit is 10 MB on free accounts), **or** paste a YouTube link
+           (unlisted is fine). Other links (Drive, Dropbox, download sites) won't be opened.
+        You can turn **Show taps** back off afterwards.
+      placeholder: Drop the video here, or paste a youtube.com / youtu.be link
   - type: textarea
     id: devices
     attributes:
