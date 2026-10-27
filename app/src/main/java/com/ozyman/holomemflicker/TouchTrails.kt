@@ -1,12 +1,13 @@
 package com.ozyman.holomemflicker
 
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import org.json.JSONArray
 
 /**
- * The flicker's own touches, as the overlay shows them: a dot that follows each finger,
+ * The flicker's own touches, as the overlay shows them: a glowing dot that follows each finger,
  * its swipe trail, and a ring that grows out wherever a tap lands. Everything fades once
  * the finger lifts. Fed from the engine's "trace" log: [seq, stroke, x, y, kind 0 down / 1 move / 2 up].
  */
@@ -63,24 +64,30 @@ class TouchTrails {
             if (f <= 0f) continue
             val a = (255 * f).toInt()
             if (up || now - s.downAt < RING_MS) animating = true
+            val glow = Raden.alpha(Raden.ORANGE, a)
             if (s.pts.size > 1) {
                 path.reset()
                 path.moveTo(s.pts[0][0] + ox, s.pts[0][1] + oy)
                 for (i in 1 until s.pts.size) path.lineTo(s.pts[i][0] + ox, s.pts[i][1] + oy)
-                trail.strokeWidth = 7f * d
-                trail.color = Raden.alpha(Raden.ORANGE, a)
+                trail.strokeWidth = 5f * d
+                trail.color = Raden.alpha(Raden.mix(Raden.ORANGE, Color.WHITE, 0.6f), a)
+                trail.setShadowLayer(8f * d, 0f, 0f, glow)
                 c.drawPath(path, trail)
             }
             val p0 = s.pts[0]
             val pl = s.pts.last()
             val age = (now - s.downAt).coerceIn(0L, RING_MS) / RING_MS.toFloat()
+            // ring that grows out where the touch landed
             trail.strokeWidth = 3f * d
-            trail.color = Raden.alpha(Raden.CREAM, (a * (1f - age * 0.85f)).toInt())
+            trail.color = Raden.alpha(Color.WHITE, (a * (1f - age * 0.85f)).toInt())
+            trail.setShadowLayer(6f * d, 0f, 0f, glow)
             c.drawCircle(p0[0] + ox, p0[1] + oy, (14f + 26f * age) * d, trail)
-            dot.color = Raden.alpha(if (up) Raden.ORANGE else Raden.CRIMSON, a)
-            c.drawCircle(pl[0] + ox, pl[1] + oy, 13f * d, dot)
-            dot.color = Raden.alpha(Raden.CREAM, a)
-            c.drawCircle(pl[0] + ox, pl[1] + oy, 5f * d, dot)
+            trail.clearShadowLayer()
+            // bright head on the finger
+            dot.color = Raden.alpha(Color.WHITE, a)
+            dot.setShadowLayer(14f * d, 0f, 0f, if (up) glow else Raden.alpha(Raden.CRIMSON, a))
+            c.drawCircle(pl[0] + ox, pl[1] + oy, 10f * d, dot)
+            dot.clearShadowLayer()
         }
         return animating
     }

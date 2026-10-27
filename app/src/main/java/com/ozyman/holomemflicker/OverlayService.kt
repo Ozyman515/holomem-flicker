@@ -468,12 +468,12 @@ class OverlayService : Service() {
 
     private inner class OverlayView(ctx: Context) : View(ctx) {
         private val painter = LayoutPainter(ctx)
-        private val bannerBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Raden.alpha(Raden.TEAL_DEEP, 0xDD) }
+        private val bannerBg = Paint(Paint.ANTI_ALIAS_FLAG)
         private val bannerTxt = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Raden.CREAM
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
             textSize = 64f
+            letterSpacing = 0.25f
         }
 
         override fun onDraw(c: Canvas) {
@@ -485,11 +485,17 @@ class OverlayService : Service() {
             if (showBanner || overlayOn) {
                 val label = if (showBanner) "$modeName mode" else modeName
                 bannerTxt.textSize = if (showBanner) 64f else 36f
-                val tw = bannerTxt.measureText(label)
+                val tw = bannerTxt.measureText(label.uppercase())
                 val top = if (showBanner) h * 0.40f else 70f
                 val r = RectF(w / 2 - tw / 2 - 40f, top, w / 2 + tw / 2 + 40f, top + bannerTxt.textSize * 1.6f)
-                c.drawRoundRect(r, 30f, 30f, bannerBg)
-                c.drawText(label, w / 2, r.centerY() + bannerTxt.textSize * 0.35f, bannerTxt)
+                // lit pill in the tap glow colour, shine on top (matches the layout's "penlight" look)
+                val glow = LayoutPainter.tapGlow()
+                bannerBg.shader = android.graphics.LinearGradient(0f, r.top, 0f, r.top + r.height() * 0.55f,
+                    Raden.alpha(android.graphics.Color.WHITE, 0x66), glow, android.graphics.Shader.TileMode.CLAMP)
+                bannerBg.setShadowLayer(r.height() * 0.45f, 0f, 0f, glow)
+                c.drawRoundRect(r, r.height() / 2, r.height() / 2, bannerBg)
+                bannerTxt.color = Raden.mix(glow, android.graphics.Color.BLACK, 0.88f)
+                c.drawText(label.uppercase(), w / 2, r.centerY() + bannerTxt.textSize * 0.35f, bannerTxt)
             }
             if (showBanner) postInvalidateDelayed(100)
         }
