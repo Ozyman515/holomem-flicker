@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.ScreensTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-27T12:11:42" hostname="runnervmtai0g" time="6.672">
+  <properties/>
+  <testcase name="editorLive" classname="com.ozyman.holomemflicker.ScreensTest" time="3.139"/>
+  <testcase name="editorPark" classname="com.ozyman.holomemflicker.ScreensTest" time="0.304"/>
+  <testcase name="overlayTouches" classname="com.ozyman.holomemflicker.ScreensTest" time="0.202"/>
+  <testcase name="allowed" classname="com.ozyman.holomemflicker.ScreensTest" time="0.35"/>
+  <testcase name="themePicker" classname="com.ozyman.holomemflicker.ScreensTest" time="0.732"/>
+  <testcase name="mainKaela" classname="com.ozyman.holomemflicker.ScreensTest" time="0.679"/>
+  <testcase name="main" classname="com.ozyman.holomemflicker.ScreensTest" time="0.576"/>
+  <testcase name="icons" classname="com.ozyman.holomemflicker.ScreensTest" time="0.081"/>
+  <testcase name="disclaimer" classname="com.ozyman.holomemflicker.ScreensTest" time="0.232"/>
+  <testcase name="disclaimerGate" classname="com.ozyman.holomemflicker.ScreensTest" time="0.169"/>
+  <testcase name="controllerTest" classname="com.ozyman.holomemflicker.ScreensTest" time="0.207"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
