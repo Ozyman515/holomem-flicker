@@ -601,7 +601,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     if (s.type != "camera") continue
                     val x = a.norm(s.ax)
                     val y = a.norm(s.ay)
-                    val cam = s.cam ?: CameraSwipe(s.bx, s.by, screenW, screenH, s.radius, s.dead).also { s.cam = it }
+                    val gap = if (mode.name == "Minigame") CameraSwipe.GAP_MINIGAME_MS else CameraSwipe.GAP_MS
+                    val cam = s.cam ?: CameraSwipe(s.bx, s.by, screenW, screenH, s.radius, s.dead, gap).also { s.cam = it }
                     if (!cam.down && s.pid >= 0) { injector.up(s.pid); s.pid = -1 } // out of sync: start clean
                     when (val op = cam.step(x, y, System.currentTimeMillis())) {
                         is CameraSwipe.Op.Down -> s.pid = injector.down(op.x, op.y)

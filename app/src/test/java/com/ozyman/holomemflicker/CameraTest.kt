@@ -63,4 +63,16 @@ class CameraTest {
         assertFalse(c2.busy(tUp + 16))
         assertEquals(null, c2.step(0f, 0f, tUp + 100))
     }
+
+    @Test
+    fun minigameStaysUpLongerOnReAnchor() {
+        val c = CameraSwipe(2000f, 800f, 2560f, 1600f, speed = 30f, dead = 0.35f, gapMs = CameraSwipe.GAP_MINIGAME_MS)
+        val ops = hold(c, 1f, 0f, 0, 3000)
+        val ups = ops.filter { it.second == Op.Up }
+        assertTrue("should re-anchor at least once", ups.isNotEmpty())
+        for ((tUp, _) in ups) {
+            val next = ops.firstOrNull { it.first > tUp } ?: continue
+            assertTrue("minigame gap was ${next.first - tUp} ms", next.first - tUp >= CameraSwipe.GAP_MINIGAME_MS)
+        }
+    }
 }

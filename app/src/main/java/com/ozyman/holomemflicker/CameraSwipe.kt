@@ -9,14 +9,16 @@ import kotlin.math.hypot
  * down again. Up to v18 that happened in the same instant: the game saw the same finger jump back
  * to the anchor inside one frame and swung the camera back with it - the "flicker" in Park.
  *
- * Now the finger lifts, stays up for [GAP_MS] (a few game frames, so the game clearly sees the
+ * Now the finger lifts, stays up for [gapMs] (a few game frames, so the game clearly sees the
  * swipe end), and comes back down on the far side of the anchor, so the next swipe has room for
  * longer and re-anchors happen about half as often.
  */
 class CameraSwipe(
     private val bx: Float, private val by: Float,
     private val screenW: Float, private val screenH: Float,
-    private val speed: Float, private val dead: Float
+    private val speed: Float, private val dead: Float,
+    /** How long the finger stays up on a re-anchor (see [GAP_MS], [GAP_MINIGAME_MS]). */
+    private val gapMs: Long = GAP_MS
 ) {
     sealed class Op {
         data class Down(val x: Float, val y: Float) : Op()
@@ -26,6 +28,12 @@ class CameraSwipe(
 
     companion object {
         const val GAP_MS = 50L
+        /**
+         * Minigames run their camera at a lower frame rate than Park, so a 50 ms lift could fall
+         * between two game frames: the game never saw the finger leave and swung the camera back
+         * on the re-anchor (the same flicker Park used to have). Stay up longer there.
+         */
+        const val GAP_MINIGAME_MS = 120L
         /** Longest single swipe, as a share of screen width. */
         const val MAX_DRAG = 0.18f
         /** Re-anchor this far behind the anchor (share of [maxDrag]), opposite to the push. */
@@ -61,7 +69,7 @@ class CameraSwipe(
         if (hypot(px - bx, py - by) > maxDrag) {
             // lift; touch down again only after the gap (see class doc)
             down = false
-            rearmAt = now + GAP_MS
+            rearmAt = now + gapMs
             return Op.Up
         }
         return Op.Move(px, py)
