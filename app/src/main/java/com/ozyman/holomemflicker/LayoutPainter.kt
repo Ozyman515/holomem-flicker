@@ -82,25 +82,23 @@ class LayoutPainter(private val ctx: Context) {
         val uy = (y1 - y0) / len
         val color = Raden.ORANGE
         val r = (t.fr * w).coerceAtLeast(26f)
-        val head = 14f * k
-        // shaft from the circle's edge to the arrowhead
-        if (len > r + head) {
-            dots.strokeWidth = 4f * k
-            dots.color = color
-            dots.pathEffect = DashPathEffect(floatArrayOf(0.1f, 9f * k), 0f)
-            dots.setShadowLayer(5f * k, 0f, 0f, color)
-            c.drawLine(x0 + ux * r, y0 + uy * r, x1 - ux * head, y1 - uy * head, dots)
-            dots.pathEffect = null
-            dots.clearShadowLayer()
-        }
-        // arrowhead
+        val head = 10f * k          // arrowhead length
+        val wing = head * 0.55f     // arrowhead half-width
+        // shaft: solid lit line from the circle's edge (or its centre, for a short swipe) to the arrowhead
+        val from = if (len > r + head * 1.5f) r else 0f
+        dots.strokeWidth = 3f * k
+        dots.color = color
+        dots.setShadowLayer(5f * k, 0f, 0f, color)
+        c.drawLine(x0 + ux * from, y0 + uy * from, x1 - ux * head, y1 - uy * head, dots)
+        dots.clearShadowLayer()
+        // slim arrowhead
         path.reset()
         path.moveTo(x1, y1)
-        path.lineTo(x1 - ux * head * 1.6f - uy * head, y1 - uy * head * 1.6f + ux * head)
-        path.lineTo(x1 - ux * head * 1.6f + uy * head, y1 - uy * head * 1.6f - ux * head)
+        path.lineTo(x1 - ux * head - uy * wing, y1 - uy * head + ux * wing)
+        path.lineTo(x1 - ux * head + uy * wing, y1 - uy * head - ux * wing)
         path.close()
         fill.color = color
-        fill.setShadowLayer(8f * k, 0f, 0f, color)
+        fill.setShadowLayer(6f * k, 0f, 0f, color)
         c.drawPath(path, fill)
         fill.clearShadowLayer()
         if (sel) {
@@ -199,7 +197,7 @@ class LayoutPainter(private val ctx: Context) {
 
     companion object {
         /** Radius of a selected swipe's aiming handle, on the 1000-wide design scale. */
-        const val HANDLE_R = 16f
+        const val HANDLE_R = 12f
 
         /** A bright, glowing version of the theme's main colour (Raden's teal comes out as sea glass). */
         fun tapGlow(): Int {
