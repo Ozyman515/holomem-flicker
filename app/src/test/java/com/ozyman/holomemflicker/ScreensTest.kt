@@ -157,6 +157,26 @@ class ScreensTest {
     }
 
     @Test fun editorLive() = editor(0, "3-editor-live")
+
+    /** Live editor with two swipe buttons (L1 up, R1 up-right) and L1 selected: arrows + aiming handle. */
+    @Test
+    fun editorSwipe() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val l = Prefs.defaults(0)
+        EditorTargets.toggleSwipe(l.taps[0], 2560, 1600)
+        EditorTargets.toggleSwipe(l.taps[1], 2560, 1600)
+        l.taps[1].sdx = 0.03f
+        Prefs.save(ctx, 0, l)
+        val i = Intent(ctx, CalibrateActivity::class.java).putExtra("mode", 0)
+        val a = Robolectric.buildActivity(CalibrateActivity::class.java, i).setup().get()
+        save(content(a), "3b-editor-swipe", 2560, 1600)
+        Raden.apply(ctx)
+        val bmp = Bitmap.createBitmap(2560, 1600, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(Raden.NIGHT)
+        LayoutPainter(ctx).draw(c, 2560f, 1600f, Prefs.load(ctx, 0), 0)
+        File(out, "3c-swipe-selected.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
     @Test fun editorPark() = editor(1, "4-editor-park")
 
     @Test

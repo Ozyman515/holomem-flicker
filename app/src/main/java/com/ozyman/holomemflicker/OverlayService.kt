@@ -278,6 +278,16 @@ class OverlayService : Service() {
             btn("Size −") { resize(-1) }
             btn("Size +") { resize(+1) }
             btn("Delete") { delete() }
+            btn("Swipe") {
+                val t = data.taps.getOrNull(selected)
+                if (t == null) say("Tap a point first, then Swipe turns it into a swipe (and back).")
+                else say(EditorTargets.toggleSwipe(t, board.width, board.height))
+            }
+            btn("Speed") {
+                val t = data.taps.getOrNull(selected)
+                say(t?.let { EditorTargets.cycleSpeed(it, board.width, board.height) }
+                    ?: "Select a swipe point first (Swipe button), then Speed changes how fast it swipes.")
+            }
             btn("Stick type") { stickType() }
             btn("Reset") {
                 val d = Prefs.defaults(mode)
@@ -300,7 +310,7 @@ class OverlayService : Service() {
                     ?: "Tap a point or stick first, then use the arrows to fine-tune where it sits.")
             }
             root.addView(pad, pad.cornerParams())
-            say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select / drag it; the arrows nudge it.")
+            say("Editing ${Prefs.MODE_NAMES.getOrElse(mode) { "?" }}. Tap empty space to add a point, then press a button. Tap a point to select it, hold it again to drag it; the arrows nudge it.")
             val lp = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -355,7 +365,7 @@ class OverlayService : Service() {
             if (!learning) return
             t.code = code
             learning = false
-            say("Point set to ${Prefs.buttonName(code)}. Drag to move, Size −/+ to resize.")
+            say("Point set to ${Prefs.buttonName(code)}. Hold it to drag, arrows to nudge, Size −/+ to resize.")
         }
 
         private fun resize(dir: Int) {
@@ -412,53 +422,57 @@ class OverlayService : Service() {
 
         private inner class Board : View(ctx) {
             private val painter = LayoutPainter(ctx)
-            private var dragging = Int.MIN_VALUE
+            private val gesture = HoldToMove()
+            private val pickUp = Runnable {
+                if (gesture.holdCheck(SystemClock.uptimeMillis())) {
+                    say(if (EditorTargets.isHandle(gesture.armed)) "Aiming the swipe - drag the arrow\u2019s end." else "Picked up - drag to move it.")
+                    performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                }
+            }
 
             override fun onDraw(c: Canvas) {
                 c.drawColor(Raden.alpha(Raden.NIGHT, 0x66))
                 painter.draw(c, width.toFloat(), height.toFloat(), data, selected)
             }
 
-            private fun hit(x: Float, y: Float): Int {
-                var best = Int.MIN_VALUE
-                var bestD = 90f
-                data.taps.forEachIndexed { i, t ->
-                    val d = Math.hypot((t.fx * width - x).toDouble(), (t.fy * height - y).toDouble()).toFloat() -
-                        maxOf(0f, t.fr * width - 45f)
-                    if (d < bestD) { bestD = d; best = i }
-                }
-                val dl = Math.hypot((data.lfx * width - x).toDouble(), (data.lfy * height - y).toDouble()).toFloat()
-                if (dl < bestD) { bestD = dl; best = -1 }
-                val dr = Math.hypot((data.rfx * width - x).toDouble(), (data.rfy * height - y).toDouble()).toFloat()
-                if (dr < bestD) best = -2
-                return best
-            }
-
             override fun onTouchEvent(e: android.view.MotionEvent): Boolean {
                 val fx = (e.x / width).coerceIn(0f, 1f)
                 val fy = (e.y / height).coerceIn(0f, 1f)
+                val now = SystemClock.uptimeMillis()
                 when (e.actionMasked) {
                     android.view.MotionEvent.ACTION_DOWN -> {
-                        val h = hit(e.x, e.y)
+                        val h = EditorTargets.hit(data, selected, e.x, e.y, width, height)
                         if (h == Int.MIN_VALUE) {
+                            gesture.down(h, false, e.x, e.y, now)
                             data.taps.add(Prefs.TapPoint(-1, fx, fy))
                             selected = data.taps.size - 1
                             learning = true
                             say("New point - press the controller button for it.")
                         } else {
-                            selected = h
-                            learning = h >= 0
-                            if (h >= 0) say("${Prefs.buttonName(data.taps[h].code)} selected. Drag, resize, delete, or press a button to reassign.")
-                            else say("${if (h == -1) "Left" else "Right"} stick selected. Drag it, or tap Stick type.")
+                            val owner = EditorTargets.owner(h)
+                            val was = owner == selected
+                            gesture.down(h, was, e.x, e.y, now)
+                            selected = owner
+                            learning = owner >= 0
+                            if (was) {
+                                postDelayed(pickUp, gesture.holdMs)
+                            } else if (owner >= 0) {
+                                val t = data.taps[owner]
+                                val kind = if (Swipe.isSwipe(t)) Swipe.describe(t, width, height) else "tap"
+                                say("${Prefs.buttonName(t.code)} selected ($kind). Hold it again to drag, arrows to nudge, or press a button to reassign.")
+                            } else {
+                                say("${if (owner == -1) "Left" else "Right"} stick selected. Hold it again to drag it, or tap Stick type.")
+                            }
                         }
-                        dragging = selected
                     }
-                    android.view.MotionEvent.ACTION_MOVE -> when {
-                        dragging == -1 -> { data.lfx = fx; data.lfy = fy }
-                        dragging == -2 -> { data.rfx = fx; data.rfy = fy }
-                        dragging >= 0 -> data.taps.getOrNull(dragging)?.let { it.fx = fx; it.fy = fy }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        val t = gesture.move(e.x, e.y, now)
+                        if (t != Int.MIN_VALUE) EditorTargets.moveTo(data, t, fx, fy)
                     }
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> dragging = Int.MIN_VALUE
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        removeCallbacks(pickUp)
+                        gesture.up()
+                    }
                 }
                 invalidate()
                 return true

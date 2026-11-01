@@ -12,8 +12,15 @@ import kotlin.math.min
  * Positions are fractions of the (landscape) screen so they survive resolution changes.
  */
 object Prefs {
-    /** fr = radius of the tap circle as a fraction of screen width; presses land randomly inside it. */
-    class TapPoint(var code: Int, var fx: Float, var fy: Float, var fr: Float = Prefs.DEFAULT_TAP_R)
+    /**
+     * fr = radius of the tap circle as a fraction of screen width; presses land randomly inside it.
+     * sdx / sdy = swipe arrow (end minus start, as fractions of screen width / height); both 0 = a plain tap.
+     * sms = how long the swipe takes (ms). See [Swipe].
+     */
+    class TapPoint(
+        var code: Int, var fx: Float, var fy: Float, var fr: Float = Prefs.DEFAULT_TAP_R,
+        var sdx: Float = 0f, var sdy: Float = 0f, var sms: Int = Swipe.DEFAULT_MS
+    )
 
     const val DEFAULT_TAP_R = 0.021f
 
@@ -25,7 +32,7 @@ object Prefs {
         var rtype: String = "flick"
     ) {
         fun copy(): Layout = Layout(
-            taps.map { TapPoint(it.code, it.fx, it.fy, it.fr) }.toMutableList(),
+            taps.map { TapPoint(it.code, it.fx, it.fy, it.fr, it.sdx, it.sdy, it.sms) }.toMutableList(),
             lfx, lfy, rfx, rfy, ltype, rtype
         )
     }
@@ -108,7 +115,11 @@ object Prefs {
 
     private fun toJson(l: Layout): JSONObject {
         val arr = JSONArray()
-        for (t in l.taps) arr.put(JSONObject().put("code", t.code).put("fx", t.fx.toDouble()).put("fy", t.fy.toDouble()).put("fr", t.fr.toDouble()))
+        for (t in l.taps) {
+            val o = JSONObject().put("code", t.code).put("fx", t.fx.toDouble()).put("fy", t.fy.toDouble()).put("fr", t.fr.toDouble())
+            if (Swipe.isSwipe(t)) o.put("sdx", t.sdx.toDouble()).put("sdy", t.sdy.toDouble()).put("sms", t.sms)
+            arr.put(o)
+        }
         return JSONObject().put("taps", arr)
             .put("lfx", l.lfx.toDouble()).put("lfy", l.lfy.toDouble())
             .put("rfx", l.rfx.toDouble()).put("rfy", l.rfy.toDouble())
@@ -120,7 +131,14 @@ object Prefs {
         val taps = ArrayList<TapPoint>()
         for (i in 0 until arr.length()) {
             val t = arr.getJSONObject(i)
-            taps.add(TapPoint(t.getInt("code"), t.getDouble("fx").toFloat(), t.getDouble("fy").toFloat(), t.optDouble("fr", DEFAULT_TAP_R.toDouble()).toFloat()))
+            taps.add(
+                TapPoint(
+                    t.getInt("code"), t.getDouble("fx").toFloat(), t.getDouble("fy").toFloat(),
+                    t.optDouble("fr", DEFAULT_TAP_R.toDouble()).toFloat(),
+                    t.optDouble("sdx", 0.0).toFloat(), t.optDouble("sdy", 0.0).toFloat(),
+                    t.optInt("sms", Swipe.DEFAULT_MS)
+                )
+            )
         }
         Layout(
             taps,
@@ -242,6 +260,9 @@ object Prefs {
                     JSONObject().put("name", buttonName(t.code)).put("code", t.code)
                         .put("x", (t.fx * w).toDouble()).put("y", (t.fy * h).toDouble())
                         .put("r", (t.fr * w).toDouble())
+                        .apply {
+                            if (Swipe.isSwipe(t)) put("sx", (t.sdx * w).toDouble()).put("sy", (t.sdy * h).toDouble()).put("ms", t.sms)
+                        }
                 )
             }
             val sticks = JSONArray()

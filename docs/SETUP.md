@@ -144,15 +144,17 @@ One button can have **several points** (one press, several fingers).
 ![Layout editor](img/editor-live.jpg)
 
 - **Background** – pick a screenshot from the game so the points line up with the real screen (take one mid-song first).
-- **Drag** a point or stick circle to move it. Tap one to select it.
+- **Tap** a point or stick circle to select it. To move it, **touch the selected one again and hold** for a moment (it buzzes), then drag. A quick touch never moves anything, so you can select a point and fine-tune it with the d-pad safely.
 - **The d-pad** (bottom corner) moves the selected point **2 pixels per tap** – hold to repeat. The middle **⇄** button moves the d-pad to the other corner.
 - **Add point** – then press the controller button for it. **Button** – reassign the selected point. **Delete** – remove it.
 - **Size − / Size +** – shrink or grow the selected circle.
+- **Swipe** – turns the selected point into a **swipe button** (and back). One press puts a finger down, slides it along the point's arrow, and lifts – even if you keep holding the button (one swipe per press). Made for fixed-direction flick notes. To aim it, select the point, then hold the round end of its arrow and drag.
+- **Speed** – with a swipe point selected, cycles how fast it swipes: 30 · 45 · 60 (default) · 80 · 120 · 200 · 400 ms.
 - **Stick type** – with a stick selected, cycles **flick → joystick → camera → off**.
 - **Reset** – back to the default layout. **Save** / **Cancel**.
 
 **In the game** – press **Select + Start**. The editor opens over the game (the game can't be touched while it's open):
-tap empty space to add a point and press its button, tap a point to select and drag it, use the same d-pad and buttons, then **Save** or **Exit**.
+tap empty space to add a point and press its button, tap a point to select it (touch it again and hold to drag it), use the same d-pad and buttons (Swipe and Speed too), then **Save** or **Exit**.
 Pressing **Select + Start** again also closes it and keeps your changes.
 
 ## 9. Tuning

@@ -22,7 +22,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import kotlin.math.hypot
 
 /**
  * Full-screen layout editor. Optional background = one of your in-song screenshots,
@@ -104,6 +103,16 @@ class CalibrateActivity : Activity() {
         }
         btn("Size −") { resize(-1) }
         btn("Size +") { resize(+1) }
+        btn("Swipe") {
+            val t = data.taps.getOrNull(selected)
+            if (t == null) say("Tap a point first, then Swipe turns it into a swipe (and back).")
+            else say(EditorTargets.toggleSwipe(t, board.width, board.height))
+        }
+        btn("Speed") {
+            val t = data.taps.getOrNull(selected)
+            say(t?.let { EditorTargets.cycleSpeed(it, board.width, board.height) }
+                ?: "Select a swipe point first (Swipe button), then Speed changes how fast it swipes.")
+        }
         btn("Stick type") {
             when (selected) {
                 SEL_LEFT -> {
@@ -132,7 +141,7 @@ class CalibrateActivity : Activity() {
             setTextColor(Raden.CREAM)
             background = Raden.rounded(Raden.alpha(Raden.TEAL_DEEP, 0xE6), 22f, Raden.ORANGE, 3)
             setPadding(28, 12, 28, 12)
-            text = "Editing ${Prefs.MODE_NAMES.getOrElse(modeIdx) { "?" }} mode. Drag markers; tap one to select it. Several points can share one button."
+            text = "Editing ${Prefs.MODE_NAMES.getOrElse(modeIdx) { "?" }} mode. Tap a marker to select it; hold it again to drag it. Several points can share one button."
         }
         col.addView(banner)
         root.addView(col, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -249,10 +258,14 @@ class CalibrateActivity : Activity() {
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
         }
-        private var dragging = SEL_NONE
+        private val gesture = HoldToMove()
+        private val pickUp = Runnable {
+            if (gesture.holdCheck(android.os.SystemClock.uptimeMillis())) {
+                say(if (EditorTargets.isHandle(gesture.armed)) "Aiming the swipe - drag the arrow\u2019s end." else "Picked up - drag to move it.")
+                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            }
+        }
 
-        private fun px(f: Float) = f * width
-        private fun py(f: Float) = f * height
 
         override fun onDraw(c: Canvas) {
             val b = bg
@@ -267,40 +280,45 @@ class CalibrateActivity : Activity() {
             painter.draw(c, width.toFloat(), height.toFloat(), data, selected)
         }
 
-        private fun hit(x: Float, y: Float): Int {
-            var best = SEL_NONE
-            var bestD = 90f
-            data.taps.forEachIndexed { i, t ->
-                val d = hypot(px(t.fx) - x, py(t.fy) - y) - maxOf(0f, t.fr * width - 45f)
-                if (d < bestD) { bestD = d; best = i }
-            }
-            val dl = hypot(px(data.lfx) - x, py(data.lfy) - y)
-            if (dl < bestD) { bestD = dl; best = SEL_LEFT }
-            val dr = hypot(px(data.rfx) - x, py(data.rfy) - y)
-            if (dr < bestD) { best = SEL_RIGHT }
-            return best
-        }
-
         override fun onTouchEvent(e: MotionEvent): Boolean {
+            val now = android.os.SystemClock.uptimeMillis()
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    dragging = hit(e.x, e.y)
-                    selected = dragging
-                    invalidate()
-                }
-                MotionEvent.ACTION_MOVE -> if (dragging != SEL_NONE) {
-                    val fx = (e.x / width).coerceIn(0f, 1f)
-                    val fy = (e.y / height).coerceIn(0f, 1f)
-                    when (dragging) {
-                        SEL_LEFT -> { data.lfx = fx; data.lfy = fy }
-                        SEL_RIGHT -> { data.rfx = fx; data.rfy = fy }
-                        else -> data.taps.getOrNull(dragging)?.let { it.fx = fx; it.fy = fy }
+                    val h = EditorTargets.hit(data, selected, e.x, e.y, width, height)
+                    val was = h != SEL_NONE && EditorTargets.owner(h) == selected
+                    gesture.down(h, was, e.x, e.y, now)
+                    selected = if (h == SEL_NONE) SEL_NONE else EditorTargets.owner(h)
+                    if (was) {
+                        postDelayed(pickUp, gesture.holdMs)
+                    } else {
+                        say(selectedText())
                     }
                     invalidate()
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> dragging = SEL_NONE
+                MotionEvent.ACTION_MOVE -> {
+                    val t = gesture.move(e.x, e.y, now)
+                    if (t != SEL_NONE) {
+                        EditorTargets.moveTo(data, t, e.x / width, e.y / height)
+                        invalidate()
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    removeCallbacks(pickUp)
+                    if (gesture.moving) say(selectedText())
+                    gesture.up()
+                }
             }
             return true
+        }
+
+        private fun selectedText(): String = when (selected) {
+            SEL_NONE -> "Tap a marker to select it."
+            SEL_LEFT -> "Left stick (${data.ltype}) selected. Hold it again to drag; the arrows nudge it."
+            SEL_RIGHT -> "Right stick (${data.rtype}) selected. Hold it again to drag; the arrows nudge it."
+            else -> data.taps.getOrNull(selected)?.let { t ->
+                val kind = if (Swipe.isSwipe(t)) Swipe.describe(t, width, height) else "tap"
+                "${Prefs.buttonName(t.code)} selected ($kind). Hold it again to drag; the arrows nudge it."
+            } ?: ""
         }
     }
 }

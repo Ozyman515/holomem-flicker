@@ -18,7 +18,8 @@ import android.graphics.Shader
  * rings with a glowing edge and a faint inner ring, a flick stick shows its reach as a dotted
  * light line with a diamond at each end, and each stick gets a lit label chip underneath.
  * Glow colours follow the member theme: taps use a bright version of the theme's main colour,
- * flicks use the theme's accent.
+ * flicks use the theme's accent. Swipe points get a lit arrow from the circle to where the swipe
+ * ends; when selected in an editor the arrow's end has a round handle to aim it.
  */
 class LayoutPainter(private val ctx: Context) {
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -40,6 +41,7 @@ class LayoutPainter(private val ctx: Context) {
         stick(c, w, h, k, "L", l.ltype, l.lfx, l.lfy, selected == -1)
         stick(c, w, h, k, "R", l.rtype, l.rfx, l.rfy, selected == -2)
         val glow = tapGlow()
+        l.taps.forEachIndexed { i, t -> if (Swipe.isSwipe(t)) arrow(c, w, h, k, t, i == selected) }
         l.taps.forEachIndexed { i, t ->
             val x = t.fx * w
             val y = t.fy * h
@@ -65,6 +67,49 @@ class LayoutPainter(private val ctx: Context) {
             text.setShadowLayer(6f * k, 0f, 0f, glow)
             c.drawText(label, x, y + text.textSize * 0.36f, text)
             text.clearShadowLayer()
+        }
+    }
+
+    /** Swipe arrow: dotted lit line from the circle's edge to the end, an arrowhead, and a handle when selected. */
+    private fun arrow(c: Canvas, w: Float, h: Float, k: Float, t: Prefs.TapPoint, sel: Boolean) {
+        val x0 = t.fx * w
+        val y0 = t.fy * h
+        val x1 = x0 + t.sdx * w
+        val y1 = y0 + t.sdy * h
+        val len = Math.hypot((x1 - x0).toDouble(), (y1 - y0).toDouble()).toFloat()
+        if (len < 1f) return
+        val ux = (x1 - x0) / len
+        val uy = (y1 - y0) / len
+        val color = Raden.ORANGE
+        val r = (t.fr * w).coerceAtLeast(26f)
+        val head = 14f * k
+        // shaft from the circle's edge to the arrowhead
+        if (len > r + head) {
+            dots.strokeWidth = 4f * k
+            dots.color = color
+            dots.pathEffect = DashPathEffect(floatArrayOf(0.1f, 9f * k), 0f)
+            dots.setShadowLayer(5f * k, 0f, 0f, color)
+            c.drawLine(x0 + ux * r, y0 + uy * r, x1 - ux * head, y1 - uy * head, dots)
+            dots.pathEffect = null
+            dots.clearShadowLayer()
+        }
+        // arrowhead
+        path.reset()
+        path.moveTo(x1, y1)
+        path.lineTo(x1 - ux * head * 1.6f - uy * head, y1 - uy * head * 1.6f + ux * head)
+        path.lineTo(x1 - ux * head * 1.6f + uy * head, y1 - uy * head * 1.6f - ux * head)
+        path.close()
+        fill.color = color
+        fill.setShadowLayer(8f * k, 0f, 0f, color)
+        c.drawPath(path, fill)
+        fill.clearShadowLayer()
+        if (sel) {
+            // handle to aim the swipe (hold it, then drag)
+            ring.strokeWidth = 3f * k
+            ring.color = Color.WHITE
+            ring.setShadowLayer(12f * k, 0f, 0f, Raden.CRIMSON)
+            c.drawCircle(x1, y1, HANDLE_R * k, ring)
+            ring.clearShadowLayer()
         }
     }
 
@@ -153,6 +198,9 @@ class LayoutPainter(private val ctx: Context) {
     }
 
     companion object {
+        /** Radius of a selected swipe's aiming handle, on the 1000-wide design scale. */
+        const val HANDLE_R = 16f
+
         /** A bright, glowing version of the theme's main colour (Raden's teal comes out as sea glass). */
         fun tapGlow(): Int {
             val hsv = FloatArray(3)

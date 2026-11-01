@@ -15,6 +15,8 @@ import kotlin.math.min
  * Reads the controller straight from /dev/input (works as the shell user)
  * and turns it into touches, using one of several MODES (Live / Park / Minigame):
  *  - tap points: a button held = a finger held at that spot (several per button allowed)
+ *  - swipe points: one press = finger down at the spot, a quick straight slide along the point's arrow, lift
+ *    (lifts at the end even if the button is still held - one swipe per press, see Swipe)
  *  - sticks, per mode:
  *      flick    : finger down at the base (shifted sideways by push direction), follows the stick
  *      joystick : same, without the sideways shift - a virtual joystick for walking
@@ -25,9 +27,16 @@ import kotlin.math.min
  */
 class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
-    /** A tap point; each press lands at a random spot inside radius [r]. */
-    private class Tap(val code: Int, val x: Float, val y: Float, val r: Float) {
+    /**
+     * A tap point; each press lands at a random spot inside radius [r].
+     * [sx]/[sy] != 0: a swipe of that offset (px) taking [ms] milliseconds.
+     */
+    private class Tap(val code: Int, val x: Float, val y: Float, val r: Float,
+                      val sx: Float = 0f, val sy: Float = 0f, val ms: Int = Swipe.DEFAULT_MS) {
         var pid = -1
+        /** bumps on every new swipe, so steps left over from an older swipe are ignored */
+        var gen = 0
+        val isSwipe get() = sx != 0f || sy != 0f
     }
 
     private val rng = java.util.Random()
@@ -219,7 +228,12 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         val ta = o.optJSONArray("taps")
         if (ta != null) for (i in 0 until ta.length()) {
             val t = ta.getJSONObject(i)
-            taps.add(Tap(t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat(), t.optDouble("r", 0.0).toFloat()))
+            taps.add(
+                Tap(
+                    t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat(), t.optDouble("r", 0.0).toFloat(),
+                    t.optDouble("sx", 0.0).toFloat(), t.optDouble("sy", 0.0).toFloat(), t.optInt("ms", Swipe.DEFAULT_MS)
+                )
+            )
         }
         val sc = ArrayList<JSONObject>()
         val sa = o.optJSONArray("sticks")
@@ -307,7 +321,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     private fun releaseMode() {
         val injector = inj ?: return
-        for (t in mode.taps) if (t.pid >= 0) { injector.up(t.pid); t.pid = -1 }
+        for (t in mode.taps) if (t.pid >= 0) { injector.up(t.pid); t.pid = -1; t.gen++ }
         for (s in mode.sticks) {
             if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
             s.cam?.reset()
@@ -529,6 +543,10 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         // ---- normal taps ----
         for (t in mode.taps) {
             if (t.code != code) continue
+            if (t.isSwipe) { // one swipe per press; the release does nothing
+                if (value == 1) swipe(injector, t)
+                continue
+            }
             if (value == 1 && t.pid < 0) {
                 val p = spot(t)
                 t.pid = injector.down(p[0], p[1])
@@ -539,9 +557,41 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         }
     }
 
-    /** Short tap at every point mapped to [code] in the current mode. */
+    /**
+     * Swipe point pressed: finger down at a random spot in the circle, slide along the arrow, lift.
+     * Ignored while that point's previous swipe is still sliding.
+     */
+    private fun swipe(injector: TouchInjector, t: Tap) {
+        if (t.pid >= 0) return
+        val p = spot(t)
+        val ex = (p[0] + t.sx).coerceIn(1f, screenW - 1f)
+        val ey = (p[1] + t.sy).coerceIn(1f, screenH - 1f)
+        val id = injector.down(p[0], p[1])
+        t.pid = id
+        val gen = ++t.gen
+        val steps = Swipe.path(p[0], p[1], ex, ey, t.ms)
+        for ((i, s) in steps.withIndex()) {
+            val last = i == steps.size - 1
+            try {
+                timer.schedule(Runnable {
+                    synchronized(this@Engine) {
+                        if (t.gen != gen || t.pid != id) return@Runnable // released (mode switch, editor, …)
+                        injector.move(id, s.second, s.third)
+                        if (last) {
+                            injector.up(id)
+                            t.pid = -1
+                        }
+                    }
+                }, s.first, TimeUnit.MILLISECONDS)
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** Short tap at every point mapped to [code] in the current mode (swipe points swipe instead). */
     private fun quickTap(injector: TouchInjector, code: Int) {
-        val ids = mode.taps.filter { it.code == code }.map { val p = spot(it); injector.down(p[0], p[1]) }
+        for (t in mode.taps) if (t.code == code && t.isSwipe) swipe(injector, t)
+        val ids = mode.taps.filter { it.code == code && !it.isSwipe }.map { val p = spot(it); injector.down(p[0], p[1]) }
         if (ids.isEmpty()) return
         timer.schedule(Runnable {
             synchronized(this@Engine) { for (id in ids) injector.up(id) }
