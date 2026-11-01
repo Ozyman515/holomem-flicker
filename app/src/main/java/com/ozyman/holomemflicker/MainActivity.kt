@@ -665,7 +665,7 @@ class LookPreview(ctx: android.content.Context) : View(ctx) {
         val l = Prefs.load(context, 0)
         c.save()
         c.clipRect(0f, 0f, w, h)
-        c.translate(0f, -h * 0.55f)
+        c.translate(0f, -h * 0.68f)
         painter.draw(c, w, h * 1.6f, l)
         c.restore()
     }
