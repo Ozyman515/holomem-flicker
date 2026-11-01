@@ -158,6 +158,33 @@ class ScreensTest {
 
     @Test fun editorLive() = editor(0, "3-editor-live")
 
+    /** Every overlay look side by side (Live layout with one swipe point, L1 selected in the last row's tiles). */
+    @Test
+    fun looks() {
+        val ctx = RuntimeEnvironment.getApplication()
+        Raden.apply(ctx)
+        val l = Prefs.defaults(0)
+        l.taps.add(Prefs.TapPoint(0x130, 0.40f, 0.62f))  // A
+        l.taps.add(Prefs.TapPoint(0x131, 0.47f, 0.62f))  // B
+        l.taps.add(Prefs.TapPoint(0x133, 0.54f, 0.62f))  // X
+        l.taps.add(Prefs.TapPoint(0x134, 0.61f, 0.62f))  // Y
+        EditorTargets.toggleSwipe(l.taps[2], 1280, 800)  // ThumbL swipes up
+        val tw = 1280; val th = 800
+        val bmp = Bitmap.createBitmap(tw * 2, th * 3, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 44f; color = android.graphics.Color.WHITE; isFakeBoldText = true }
+        Looks.ALL.forEachIndexed { i, look ->
+            c.save()
+            c.translate((i % 2) * tw.toFloat(), (i / 2) * th.toFloat())
+            c.clipRect(0, 0, tw, th)
+            c.drawColor(0xFF2A2340.toInt()) // stand-in for the game
+            LayoutPainter(ctx).draw(c, tw.toFloat(), th.toFloat(), l, if (i >= 4) 0 else Int.MIN_VALUE, look)
+            c.drawText(Looks.NAMES[look]!!, 40f, 70f, p)
+            c.restore()
+        }
+        File(out, "13-looks.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     /** Live editor with two swipe buttons (L1 up, R1 up-right) and L1 selected: arrows + aiming handle. */
     @Test
     fun editorSwipe() {

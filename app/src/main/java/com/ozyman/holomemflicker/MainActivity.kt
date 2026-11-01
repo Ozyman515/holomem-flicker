@@ -266,6 +266,27 @@ class MainActivity : Activity() {
             else safe { sv.setOverlay(!(JSONObject(sv.inputState()).optBoolean("overlay"))) }
         }
 
+        section("Overlay look")
+        label("How the circles and buttons look in the overlay and the editors. Colours follow your theme.", 14f)
+            .setTextColor(Raden.INK_SOFT)
+        val lookPreview = LookPreview(this)
+        cur.addView(lookPreview, LinearLayout.LayoutParams(-1, (resources.displayMetrics.density * 220).toInt()).apply { topMargin = 8 })
+        val lookText = label("", 14f)
+        val lookBtns = ArrayList<Button>()
+        fun showLook() {
+            val now = Looks.current(this)
+            lookText.text = "${Looks.NAMES[now]}: ${Looks.BLURBS[now]}"
+            Looks.ALL.forEachIndexed { j, key -> Raden.pill(lookBtns[j], if (key == now) Raden.CRIMSON else Raden.TEAL) }
+            lookPreview.invalidate()
+        }
+        for (chunk in Looks.ALL.chunked(3)) row(*chunk.map { key ->
+            Button(this).apply {
+                text = Looks.NAMES[key]
+                setOnClickListener { Looks.set(this@MainActivity, key); showLook() }
+            }.also { lookBtns.add(it) }
+        }.toTypedArray())
+        showLook()
+
         section("Tuning")
         label("Press Start again to apply.", 14f).setTextColor(Raden.INK_SOFT)
         slider("Flick length", Prefs.RADIUS, 50, 15, 150) { "%.1f%% of screen width".format(it / 10f) }
@@ -625,5 +646,27 @@ class MainActivity : Activity() {
             else -> "Auto"
         }
         axesBtn.text = "Right stick axes: $v (tap to change if the right stick doesn't move in Live input)"
+    }
+}
+
+/** Small preview of the Live layout in the chosen overlay look, over a dark stand-in for the game. */
+class LookPreview(ctx: android.content.Context) : View(ctx) {
+    private val painter = LayoutPainter(ctx)
+    private val bg = android.graphics.Paint()
+
+    override fun onDraw(c: android.graphics.Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        bg.color = Raden.NIGHT
+        c.drawRoundRect(0f, 0f, w, h, 28f, 28f, bg)
+        bg.color = Raden.alpha(Raden.PLATINUM, 0x44)
+        c.drawRect(0f, h * 0.62f, w, h * 0.63f, bg) // judgment line
+        // the Live layout, scaled so its bottom row sits in the box
+        val l = Prefs.load(context, 0)
+        c.save()
+        c.clipRect(0f, 0f, w, h)
+        c.translate(0f, -h * 0.55f)
+        painter.draw(c, w, h * 1.6f, l)
+        c.restore()
     }
 }
