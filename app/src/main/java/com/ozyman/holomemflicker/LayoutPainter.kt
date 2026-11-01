@@ -409,19 +409,19 @@ class LayoutPainter(private val ctx: Context) {
     /** A circle outline drawn as square blocks on a [px] grid. */
     private fun pixelRing(c: Canvas, x: Float, y: Float, r: Float, px: Float, color: Int) {
         fill.color = color
-        val n = Math.ceil(r / px).toInt()
+        val n = Math.ceil((r / px).toDouble()).toInt()
         for (i in -n..n) for (j in -n..n) {
             val d = Math.hypot(i.toDouble(), j.toDouble()) * px
-            if (d <= r && d > r - px * 1.2f) c.drawRect(x + i * px - px / 2, y + j * px - px / 2, x + i * px + px / 2, y + j * px + px / 2, fill)
+            if (d <= r && d > r - px * 1.2) c.drawRect(x + i * px - px / 2, y + j * px - px / 2, x + i * px + px / 2, y + j * px + px / 2, fill)
         }
     }
 
     /** A filled circle drawn as square blocks (uses the current fill colour). */
     private fun pixelDisc(c: Canvas, x: Float, y: Float, r: Float, px: Float) {
-        val n = Math.ceil(r / px).toInt()
+        val n = Math.ceil((r / px).toDouble()).toInt()
         for (j in -n..n) {
             var lo = Int.MAX_VALUE; var hi = Int.MIN_VALUE
-            for (i in -n..n) if (Math.hypot(i.toDouble(), j.toDouble()) * px <= r) { lo = minOf(lo, i); hi = maxOf(hi, i) }
+            for (i in -n..n) if (Math.hypot(i.toDouble(), j.toDouble()) * px <= r.toDouble()) { lo = minOf(lo, i); hi = maxOf(hi, i) }
             if (lo <= hi) c.drawRect(x + lo * px - px / 2, y + j * px - px / 2, x + hi * px + px / 2, y + j * px + px / 2, fill)
         }
     }
