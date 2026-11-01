@@ -17,7 +17,7 @@ import android.graphics.Shader
  * "Penlight" look: taps are lit round buttons (shine on top, glowing outline), sticks are dark
  * rings with a glowing edge and a faint inner ring, a flick stick shows its reach as a dotted
  * light line with a diamond at each end, and each stick gets a lit label chip underneath.
- * Other looks (Settings → Overlay look, see [Looks]): Minimal, Neon, Bubble, Gamepad, Pixel.
+ * Other styles (main screen → Style, see [Looks]): Minimal, Neon, Bubble, Gamepad, Pixel.
  * Glow colours follow the member theme: taps use a bright version of the theme's main colour,
  * flicks use the theme's accent. Swipe points get a lit arrow from the circle to where the swipe
  * ends; when selected in an editor the arrow's end has a round handle to aim it.

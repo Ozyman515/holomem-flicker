@@ -266,8 +266,8 @@ class MainActivity : Activity() {
             else safe { sv.setOverlay(!(JSONObject(sv.inputState()).optBoolean("overlay"))) }
         }
 
-        section("Overlay look")
-        label("How the circles and buttons look in the overlay and the editors. Colours follow your theme.", 14f)
+        section("Style")
+        label("Pick how the circles and buttons look in the overlay and the editors. Colours follow your theme.", 14f)
             .setTextColor(Raden.INK_SOFT)
         val lookPreview = LookPreview(this)
         cur.addView(lookPreview, LinearLayout.LayoutParams(-1, (resources.displayMetrics.density * 220).toInt()).apply { topMargin = 8 })

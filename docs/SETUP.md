@@ -157,6 +157,9 @@ One button can have **several points** (one press, several fingers).
 tap empty space to add a point and press its button, tap a point to select it (touch it again and hold to drag it), use the same d-pad and buttons (Swipe and Speed too), then **Save** or **Exit**.
 Pressing **Select + Start** again also closes it and keeps your changes.
 
+**Style** – on the main screen, pick how the circles and buttons are drawn (the preview updates as you tap):
+**Penlight** (default), **Minimal**, **Neon**, **Bubble**, **Gamepad** or **Pixel**. It applies to the in-game overlay and both editors; colours always follow your theme.
+
 ## 9. Tuning
 
 In the **Tuning** card (tap **Start flicker** again afterwards to apply):
