@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.ScreensTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-02T02:46:10" hostname="runnervmnwato" time="11.78">
+  <properties/>
+  <testcase name="editorLive" classname="com.ozyman.holomemflicker.ScreensTest" time="4.468"/>
+  <testcase name="editorPark" classname="com.ozyman.holomemflicker.ScreensTest" time="0.478"/>
+  <testcase name="overlayTouches" classname="com.ozyman.holomemflicker.ScreensTest" time="0.365"/>
+  <testcase name="editorSwipe" classname="com.ozyman.holomemflicker.ScreensTest" time="0.733"/>
+  <testcase name="allowed" classname="com.ozyman.holomemflicker.ScreensTest" time="0.504"/>
+  <testcase name="themePicker" classname="com.ozyman.holomemflicker.ScreensTest" time="1.295"/>
+  <testcase name="mainKaela" classname="com.ozyman.holomemflicker.ScreensTest" time="1.175"/>
+  <testcase name="main" classname="com.ozyman.holomemflicker.ScreensTest" time="1.209"/>
+  <testcase name="icons" classname="com.ozyman.holomemflicker.ScreensTest" time="0.136"/>
+  <testcase name="looks" classname="com.ozyman.holomemflicker.ScreensTest" time="0.428"/>
+  <testcase name="disclaimer" classname="com.ozyman.holomemflicker.ScreensTest" time="0.449"/>
+  <testcase name="disclaimerGate" classname="com.ozyman.holomemflicker.ScreensTest" time="0.233"/>
+  <testcase name="controllerTest" classname="com.ozyman.holomemflicker.ScreensTest" time="0.307"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

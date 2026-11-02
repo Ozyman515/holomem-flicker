@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.BatteryTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-02T02:46:02" hostname="runnervmnwato" time="8.096">
+  <properties/>
+  <testcase name="sleepsAfterIdleAndWakesOnAnyButton" classname="com.ozyman.holomemflicker.BatteryTest" time="5.883"/>
+  <testcase name="overlayToggleAndModeChangeWakeTheOverlay" classname="com.ozyman.holomemflicker.BatteryTest" time="0.075"/>
+  <testcase name="waitReturnsOnTimeoutWhenNothingHappens" classname="com.ozyman.holomemflicker.BatteryTest" time="0.355"/>
+  <testcase name="trailsAskOnlyForNewTouches" classname="com.ozyman.holomemflicker.BatteryTest" time="0.125"/>
+  <testcase name="activityKeepsItAwake" classname="com.ozyman.holomemflicker.BatteryTest" time="0.99"/>
+  <testcase name="plainButtonPressWakesTheOverlay" classname="com.ozyman.holomemflicker.BatteryTest" time="0.133"/>
+  <testcase name="waitWakesImmediatelyOnAButton" classname="com.ozyman.holomemflicker.BatteryTest" time="0.181"/>
+  <testcase name="selectL1WakesTheOverlayImmediately" classname="com.ozyman.holomemflicker.BatteryTest" time="0.352"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

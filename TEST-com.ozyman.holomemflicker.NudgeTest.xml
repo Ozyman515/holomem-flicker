@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.NudgeTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-02T02:46:10" hostname="runnervmnwato" time="0.236">
+  <properties/>
+  <testcase name="staysOnScreenAndNeedsASelection" classname="com.ozyman.holomemflicker.NudgeTest" time="0.11"/>
+  <testcase name="sizeStepIsHalfTheOldOne" classname="com.ozyman.holomemflicker.NudgeTest" time="0.04"/>
+  <testcase name="rightMovesATapPointTwoPixelsRight" classname="com.ozyman.holomemflicker.NudgeTest" time="0.032"/>
+  <testcase name="allFourDirectionsAndBackAgain" classname="com.ozyman.holomemflicker.NudgeTest" time="0.026"/>
+  <testcase name="movesSticksToo" classname="com.ozyman.holomemflicker.NudgeTest" time="0.027"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

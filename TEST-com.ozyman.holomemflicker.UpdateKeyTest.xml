@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.UpdateKeyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-02T02:46:22" hostname="runnervmnwato" time="0.079">
+  <properties/>
+  <testcase name="acceptsManifestSignedWithTheFlickerKey" classname="com.ozyman.holomemflicker.UpdateKeyTest" time="0.028"/>
+  <testcase name="rejectsATamperedManifest" classname="com.ozyman.holomemflicker.UpdateKeyTest" time="0.028"/>
+  <testcase name="rejectsGarbage" classname="com.ozyman.holomemflicker.UpdateKeyTest" time="0.022"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

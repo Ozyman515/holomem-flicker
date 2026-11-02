@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.SwipeTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-02T02:46:22" hostname="runnervmnwato" time="0.414">
+  <properties/>
+  <testcase name="slidingBeforeTheHoldCancelsThePickUp" classname="com.ozyman.holomemflicker.SwipeTest" time="0.028"/>
+  <testcase name="handleOfTheSelectedSwipeIsGrabbedAndReAims" classname="com.ozyman.holomemflicker.SwipeTest" time="0.021"/>
+  <testcase name="swipeButtonTogglesBackToATap" classname="com.ozyman.holomemflicker.SwipeTest" time="0.03"/>
+  <testcase name="speedCyclesAndWraps" classname="com.ozyman.holomemflicker.SwipeTest" time="0.021"/>
+  <testcase name="veryFastSwipeStillHasAMiddleStep" classname="com.ozyman.holomemflicker.SwipeTest" time="0.02"/>
+  <testcase name="emptySpaceNeverMovesAnything" classname="com.ozyman.holomemflicker.SwipeTest" time="0.023"/>
+  <testcase name="selectedMarkerMovesOnlyAfterTheHold" classname="com.ozyman.holomemflicker.SwipeTest" time="0.026"/>
+  <testcase name="swipeIsSavedLoadedAndSentToTheEngine" classname="com.ozyman.holomemflicker.SwipeTest" time="0.07"/>
+  <testcase name="pathEndsExactlyOnTheEndPointAtTheSwipeTime" classname="com.ozyman.holomemflicker.SwipeTest" time="0.034"/>
+  <testcase name="endButtonNeedsASwipePoint" classname="com.ozyman.holomemflicker.SwipeTest" time="0.02"/>
+  <testcase name="handleNeverTurnsTheSwipeBackIntoATap" classname="com.ozyman.holomemflicker.SwipeTest" time="0.02"/>
+  <testcase name="describeReadsTheDirection" classname="com.ozyman.holomemflicker.SwipeTest" time="0.024"/>
+  <testcase name="holdAtTheEndIsSavedAndSentToTheEngine" classname="com.ozyman.holomemflicker.SwipeTest" time="0.035"/>
+  <testcase name="firstTouchOnlySelects" classname="com.ozyman.holomemflicker.SwipeTest" time="0.021"/>
+  <testcase name="copyKeepsTheSwipe" classname="com.ozyman.holomemflicker.SwipeTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
