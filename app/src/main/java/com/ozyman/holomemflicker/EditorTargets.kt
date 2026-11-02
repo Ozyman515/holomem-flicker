@@ -71,6 +71,13 @@ object EditorTargets {
         }
     }
 
+    /** End button: one swipe per press (lift at the end) ↔ hold at the end until the button is released. */
+    fun toggleHold(t: Prefs.TapPoint, w: Int, h: Int): String? {
+        if (!Swipe.isSwipe(t)) return null
+        t.shold = !t.shold
+        return "${Prefs.buttonName(t.code)}: ${Swipe.describe(t, w, h)}."
+    }
+
     /** Speed button: cycles the selected swipe's duration. Returns the banner text, or null if it isn't a swipe. */
     fun cycleSpeed(t: Prefs.TapPoint, w: Int, h: Int): String? {
         if (!Swipe.isSwipe(t)) return null

@@ -288,6 +288,11 @@ class OverlayService : Service() {
                 say(t?.let { EditorTargets.cycleSpeed(it, board.width, board.height) }
                     ?: "Select a swipe point first (Swipe button), then Speed changes how fast it swipes.")
             }
+            btn("End") {
+                val t = data.taps.getOrNull(selected)
+                say(t?.let { EditorTargets.toggleHold(it, board.width, board.height) }
+                    ?: "Select a swipe point first (Swipe button), then End switches between lifting at the end and holding until you let go.")
+            }
             btn("Stick type") { stickType() }
             btn("Reset") {
                 val d = Prefs.defaults(mode)

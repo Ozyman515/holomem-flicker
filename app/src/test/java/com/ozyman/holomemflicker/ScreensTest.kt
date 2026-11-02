@@ -193,6 +193,7 @@ class ScreensTest {
         EditorTargets.toggleSwipe(l.taps[0], 2560, 1600)
         EditorTargets.toggleSwipe(l.taps[1], 2560, 1600)
         l.taps[1].sdx = 0.03f
+        l.taps[1].shold = true
         Prefs.save(ctx, 0, l)
         val i = Intent(ctx, CalibrateActivity::class.java).putExtra("mode", 0)
         val a = Robolectric.buildActivity(CalibrateActivity::class.java, i).setup().get()

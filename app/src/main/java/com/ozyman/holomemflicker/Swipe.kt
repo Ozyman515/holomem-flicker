@@ -55,6 +55,6 @@ object Swipe {
             deg >= 112.5 && deg < 157.5 -> "up-left"
             else -> "left"
         }
-        return "swipe $dir, $len px in ${t.sms} ms"
+        return "swipe $dir, $len px in ${t.sms} ms, ${if (t.shold) "holds at the end until released" else "then lifts"}"
     }
 }

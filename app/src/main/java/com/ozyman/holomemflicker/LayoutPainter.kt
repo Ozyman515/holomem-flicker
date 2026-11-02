@@ -461,6 +461,13 @@ class LayoutPainter(private val ctx: Context) {
         fill.setShadowLayer(6f * k, 0f, 0f, color)
         c.drawPath(path, fill)
         fill.clearShadowLayer()
+        if (t.shold) {
+            // hold at the end: a bar across the tip (the finger stops there until you let go)
+            dots.strokeWidth = 3f * k
+            dots.color = color
+            val bar = wing * 1.9f
+            c.drawLine(x1 + ux * 3f * k - uy * bar, y1 + uy * 3f * k + ux * bar, x1 + ux * 3f * k + uy * bar, y1 + uy * 3f * k - ux * bar, dots)
+        }
         if (sel) {
             // handle to aim the swipe (hold it, then drag)
             ring.strokeWidth = 3f * k

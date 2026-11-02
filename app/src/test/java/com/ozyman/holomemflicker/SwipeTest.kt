@@ -75,6 +75,32 @@ class SwipeTest {
     }
 
     @Test
+    fun holdAtTheEndIsSavedAndSentToTheEngine() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val l = Prefs.defaults(0)
+        val t = l.taps[0]
+        EditorTargets.toggleSwipe(t, w, h)
+        assertFalse(t.shold) // new swipes lift at the end (one swipe per press)
+        assertTrue(EditorTargets.toggleHold(t, w, h)!!.contains("holds at the end"))
+        assertTrue(t.shold)
+        Prefs.save(ctx, 0, l)
+        assertTrue(Prefs.load(ctx, 0).taps[0].shold)
+        assertFalse(Prefs.load(ctx, 0).taps[1].shold)
+        val tap = JSONObject(Prefs.buildConfig(ctx)).getJSONArray("modes").getJSONObject(0).getJSONArray("taps").getJSONObject(0)
+        assertTrue(tap.getBoolean("hold"))
+        assertTrue(l.copy().taps[0].shold)
+        assertTrue(EditorTargets.toggleHold(t, w, h)!!.contains("then lifts"))
+        assertFalse(t.shold)
+    }
+
+    @Test
+    fun endButtonNeedsASwipePoint() {
+        val t = Prefs.defaults(0).taps[0]
+        assertEquals(null, EditorTargets.toggleHold(t, w, h))
+        assertFalse(t.shold)
+    }
+
+    @Test
     fun copyKeepsTheSwipe() {
         val l = Prefs.defaults(0)
         EditorTargets.toggleSwipe(l.taps[0], w, h)

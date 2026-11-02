@@ -30,10 +30,16 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     /**
      * A tap point; each press lands at a random spot inside radius [r].
      * [sx]/[sy] != 0: a swipe of that offset (px) taking [ms] milliseconds.
+     * [hold]: at the end of the swipe the finger stays down until the button is released.
      */
     private class Tap(val code: Int, val x: Float, val y: Float, val r: Float,
-                      val sx: Float = 0f, val sy: Float = 0f, val ms: Int = Swipe.DEFAULT_MS) {
+                      val sx: Float = 0f, val sy: Float = 0f, val ms: Int = Swipe.DEFAULT_MS,
+                      val hold: Boolean = false) {
         var pid = -1
+        /** the button is being held right now (swipe points) */
+        var held = false
+        /** the swipe has reached the end of its arrow and the finger is resting there (hold mode) */
+        var resting = false
         /** bumps on every new swipe, so steps left over from an older swipe are ignored */
         var gen = 0
         val isSwipe get() = sx != 0f || sy != 0f
@@ -231,7 +237,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             taps.add(
                 Tap(
                     t.optInt("code"), t.optDouble("x").toFloat(), t.optDouble("y").toFloat(), t.optDouble("r", 0.0).toFloat(),
-                    t.optDouble("sx", 0.0).toFloat(), t.optDouble("sy", 0.0).toFloat(), t.optInt("ms", Swipe.DEFAULT_MS)
+                    t.optDouble("sx", 0.0).toFloat(), t.optDouble("sy", 0.0).toFloat(), t.optInt("ms", Swipe.DEFAULT_MS),
+                    t.optBoolean("hold", false)
                 )
             )
         }
@@ -321,7 +328,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     private fun releaseMode() {
         val injector = inj ?: return
-        for (t in mode.taps) if (t.pid >= 0) { injector.up(t.pid); t.pid = -1; t.gen++ }
+        for (t in mode.taps) { if (t.pid >= 0) { injector.up(t.pid); t.pid = -1; t.gen++ }; t.held = false; t.resting = false }
         for (s in mode.sticks) {
             if (s.pid >= 0) { injector.up(s.pid); s.pid = -1 }
             s.cam?.reset()
@@ -543,8 +550,20 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         // ---- normal taps ----
         for (t in mode.taps) {
             if (t.code != code) continue
-            if (t.isSwipe) { // one swipe per press; the release does nothing
-                if (value == 1) swipe(injector, t)
+            if (t.isSwipe) {
+                if (value == 1) {
+                    t.held = true
+                    swipe(injector, t)
+                } else if (value == 0) {
+                    t.held = false
+                    // hold mode: the finger was resting at the end - lift it now
+                    // (still sliding: the last step sees held == false and lifts by itself)
+                    if (t.resting && t.pid >= 0) {
+                        injector.up(t.pid)
+                        t.pid = -1
+                        t.resting = false
+                    }
+                }
                 continue
             }
             if (value == 1 && t.pid < 0) {
@@ -559,7 +578,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     /**
      * Swipe point pressed: finger down at a random spot in the circle, slide along the arrow, lift.
-     * Ignored while that point's previous swipe is still sliding.
+     * Hold mode: if the button is still held when the slide ends, the finger rests there until release.
+     * Ignored while that point's previous swipe is still sliding (or resting).
      */
     private fun swipe(injector: TouchInjector, t: Tap) {
         if (t.pid >= 0) return
@@ -568,6 +588,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         val ey = (p[1] + t.sy).coerceIn(1f, screenH - 1f)
         val id = injector.down(p[0], p[1])
         t.pid = id
+        t.resting = false
         val gen = ++t.gen
         val steps = Swipe.path(p[0], p[1], ex, ey, t.ms)
         for ((i, s) in steps.withIndex()) {
@@ -578,8 +599,12 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                         if (t.gen != gen || t.pid != id) return@Runnable // released (mode switch, editor, …)
                         injector.move(id, s.second, s.third)
                         if (last) {
-                            injector.up(id)
-                            t.pid = -1
+                            if (t.hold && t.held) {
+                                t.resting = true // lifted by the button's release
+                            } else {
+                                injector.up(id)
+                                t.pid = -1
+                            }
                         }
                     }
                 }, s.first, TimeUnit.MILLISECONDS)
@@ -590,7 +615,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     /** Short tap at every point mapped to [code] in the current mode (swipe points swipe instead). */
     private fun quickTap(injector: TouchInjector, code: Int) {
-        for (t in mode.taps) if (t.code == code && t.isSwipe) swipe(injector, t)
+        for (t in mode.taps) if (t.code == code && t.isSwipe) { t.held = false; swipe(injector, t) }
         val ids = mode.taps.filter { it.code == code && !it.isSwipe }.map { val p = spot(it); injector.down(p[0], p[1]) }
         if (ids.isEmpty()) return
         timer.schedule(Runnable {

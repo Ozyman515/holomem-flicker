@@ -150,11 +150,12 @@ One button can have **several points** (one press, several fingers).
 - **Size − / Size +** – shrink or grow the selected circle.
 - **Swipe** – turns the selected point into a **swipe button** (and back). One press puts a finger down, slides it along the point's arrow, and lifts – even if you keep holding the button (one swipe per press). Made for fixed-direction flick notes. To aim it, select the point, then hold the round end of its arrow and drag.
 - **Speed** – with a swipe point selected, cycles how fast it swipes: 30 · 45 · 60 (default) · 80 · 120 · 200 · 400 ms.
+- **End** – with a swipe point selected, switches what happens when the slide finishes: **lift** (default – one swipe per press, even if you keep holding) or **hold** (the finger stays at the end of the arrow while you hold the button and lifts when you let go). Hold swipes show a bar across the arrow's tip.
 - **Stick type** – with a stick selected, cycles **flick → joystick → camera → off**.
 - **Reset** – back to the default layout. **Save** / **Cancel**.
 
 **In the game** – press **Select + Start**. The editor opens over the game (the game can't be touched while it's open):
-tap empty space to add a point and press its button, tap a point to select it (touch it again and hold to drag it), use the same d-pad and buttons (Swipe and Speed too), then **Save** or **Exit**.
+tap empty space to add a point and press its button, tap a point to select it (touch it again and hold to drag it), use the same d-pad and buttons (Swipe, Speed and End too), then **Save** or **Exit**.
 Pressing **Select + Start** again also closes it and keeps your changes.
 
 **Style** – on the main screen, pick how the circles and buttons are drawn (the preview updates as you tap):
