@@ -207,6 +207,26 @@ class ScreensTest {
     }
     @Test fun editorPark() = editor(1, "4-editor-park")
 
+    /** Select+Y quick menu over the Live layout (highlight on "Look"), Raden and Kaela themes. */
+    @Test
+    fun quickMenu() {
+        val ctx = RuntimeEnvironment.getApplication()
+        for ((theme, name) in listOf("raden" to "3d-quick-menu", "kaela" to "3e-quick-menu-kaela")) {
+            Prefs.putStr(ctx, Raden.PREF_KEY, theme)
+            Raden.apply(ctx)
+            val bmp = Bitmap.createBitmap(2560, 1600, Bitmap.Config.ARGB_8888)
+            val c = Canvas(bmp)
+            c.drawColor(Raden.NIGHT)
+            LayoutPainter(ctx).draw(c, 2560f, 1600f, Prefs.load(ctx, 0))
+            val look = Looks.current(ctx)
+            val rows = QuickMenu.rows(listOf("Live", "Park", "Minigame"), 0, true, Looks.NAMES[look] ?: look)
+            QuickMenuPainter(2f).draw(c, 2560f, 1600f, rows, 4, LayoutPainter.tapGlow())
+            File(out, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        Prefs.putStr(ctx, Raden.PREF_KEY, "raden")
+        Raden.apply(ctx)
+    }
+
     @Test
     fun controllerTest() {
         // demo state: L4/R4 taught as your current L3/R3 remap, the rest untaught

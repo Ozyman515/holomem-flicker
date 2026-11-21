@@ -126,6 +126,7 @@ The flicker has three **modes**, each with its own layout. Pick one on the main 
 | **Select + L1** | Show / hide the layout overlay (with live dots and trails of every touch) |
 | **Select + R1** | Next mode (a banner shows the mode name) |
 | **Select + Start** | Open the in-game layout editor |
+| **Select + Y** | Quick menu: pick a mode, turn the overlay on/off, change the look, or open the editor. **D-pad** up/down moves, **A** chooses, **B** (or Select + Y) closes. Nothing reaches the game while it's open. |
 
 Buttons pressed while Select is held never tap. **Select on its own** still taps if it's mapped (on release).
 

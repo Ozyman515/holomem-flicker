@@ -31,6 +31,7 @@ import rikka.shizuku.Shizuku
  * Watches the engine and draws, over the game:
  *  - the current mode's layout when the overlay is toggled on (Select+L1)
  *  - a short banner with the mode name whenever the mode changes (Select+R1)
+ *  - the quick menu (Select+Y, see [QuickMenu]) while the engine has it open
  * The window never takes touches, and stays under Android's 0.8 opacity limit so
  * touches (real or injected) still reach the game underneath.
  */
@@ -47,6 +48,13 @@ class OverlayService : Service() {
     private var lastSeq = -1
     private var bannerUntil = 0L
     private val layouts = HashMap<Int, Prefs.Layout>()
+
+    // quick menu (drawn from the engine's state)
+    private var menuOpen = false
+    private var menuIdx = 0
+    private var menuOpenedAt = 0L
+    private var modeNames: List<String> = emptyList()
+    private var lastLookSeq = -1
 
     // Injected touches, drawn as dots + trails while the overlay is on (like the controller test screen)
     private val touches = TouchTrails()
@@ -137,6 +145,18 @@ class OverlayService : Service() {
                 lastKeySeen = lk
             }
             editor?.onPoll(pressedNow)
+            val menu = o.optBoolean("menu")
+            if (menu && !menuOpen) menuOpenedAt = SystemClock.uptimeMillis()
+            menuOpen = menu
+            menuIdx = o.optInt("menuIdx")
+            val names = o.optJSONArray("modeNames")
+            if (names != null) modeNames = (0 until names.length()).map { names.optString(it) }
+            val ls = o.optInt("lookSeq")
+            if (lastLookSeq >= 0 && ls != lastLookSeq) {
+                val cur = Looks.current(this)
+                Looks.set(this, Looks.ALL[(Looks.ALL.indexOf(cur) + 1) % Looks.ALL.size])
+            }
+            lastLookSeq = ls
             touches.read(o.optJSONArray("trace"), SystemClock.uptimeMillis())
         } catch (_: Throwable) {
         }
@@ -181,7 +201,7 @@ class OverlayService : Service() {
             .setContentTitle(if (sleeping) "Holomem Flicker is sleeping" else "Holomem Flicker is running")
             .setContentText(
                 if (sleeping) "No controller input for a minute · press any button or move a stick to wake"
-                else "Select+L1: show layout · Select+R1: switch mode"
+                else "Select+L1: show layout · Select+R1: switch mode · Select+Y: quick menu"
             )
             .setSmallIcon(if (sleeping) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_ff)
             .setContentIntent(open)
@@ -209,7 +229,7 @@ class OverlayService : Service() {
 
     private fun refresh() {
         val showBanner = SystemClock.uptimeMillis() < bannerUntil
-        val want = (overlayOn || showBanner) && editor == null && !sleeping
+        val want = (overlayOn || showBanner || menuOpen) && editor == null && !sleeping
         if (want && view == null) addView()
         if (!want && view != null) removeView()
         view?.invalidate()
@@ -516,7 +536,19 @@ class OverlayService : Service() {
                 bannerTxt.color = Raden.mix(glow, android.graphics.Color.BLACK, 0.88f)
                 c.drawText(label.uppercase(), w / 2, r.centerY() + bannerTxt.textSize * 0.35f, bannerTxt)
             }
+            if (menuOpen) drawMenu(c, w, h)
             if (showBanner) postInvalidateDelayed(100)
+        }
+
+        // ---- quick menu ----
+        private val menuPainter = QuickMenuPainter(resources.displayMetrics.density)
+
+        private fun drawMenu(c: Canvas, w: Float, h: Float) {
+            val look = Looks.current(this@OverlayService)
+            val rows = QuickMenu.rows(modeNames, modeIdx, overlayOn, Looks.NAMES[look] ?: look)
+            val t = ((SystemClock.uptimeMillis() - menuOpenedAt) / 140f).coerceIn(0f, 1f)
+            menuPainter.draw(c, w, h, rows, menuIdx, LayoutPainter.tapGlow(), t)
+            if (t < 1f) postInvalidateDelayed(16)
         }
 
         private val loc = IntArray(2)

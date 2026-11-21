@@ -22,7 +22,8 @@ import kotlin.math.min
  *      joystick : same, without the sideways shift - a virtual joystick for walking
  *      camera   : continuous swipe from an anchor while the stick is held (re-anchors at the edge, see CameraSwipe)
  *      off
- *  - combos: hold the MODIFIER (Select). Select+L1 = overlay on/off, Select+R1 = next mode.
+ *  - combos: hold the MODIFIER (Select). Select+L1 = overlay on/off, Select+R1 = next mode,
+ *    Select+Y = quick menu (D-pad up/down picks, A chooses, B or Select+Y closes; see [QuickMenu]).
  *    Buttons pressed while Select is held never tap. Select alone taps (on release) if mapped.
  */
 class Engine(cfg: JSONObject) : Thread("flicker-engine") {
@@ -98,6 +99,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     private val overlayKey = cfg.optInt("overlayKey", 0x136)
     private val modeKey = cfg.optInt("modeKey", 0x137)
     private val editKey = cfg.optInt("editKey", 0x13b)
+    private val menuKey = cfg.optInt("menuKey", 0x134)
 
     private val modes = ArrayList<Mode>()
     @Volatile var modeIdx = 0
@@ -107,6 +109,15 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     @Volatile var modeSeq = 0
         private set
     @Volatile var editing = false
+        private set
+
+    // quick menu: while open nothing reaches the game; the overlay draws it from [stateJson]
+    @Volatile var menuOpen = false
+        private set
+    @Volatile var menuIdx = 0
+        private set
+    /** bumps each time "Look" is chosen; the overlay switches to the next look when it changes */
+    @Volatile var lookSeq = 0
         private set
 
     private var modHeld = false
@@ -281,6 +292,10 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("overlay", overlayOn)
         o.put("modeSeq", modeSeq)
         o.put("editing", editing)
+        o.put("menu", menuOpen)
+        o.put("menuIdx", menuIdx)
+        o.put("lookSeq", lookSeq)
+        o.put("modeNames", JSONArray(modes.map { it.name }))
         o.put("lastKey", lastKey)
         o.put("running", status.startsWith("Running"))
         if (overlayOn && !sleeping) inj?.let { i ->
@@ -321,8 +336,52 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     /** In-game editor open: nothing reaches the game. */
     @Synchronized
     fun setEditing(on: Boolean) {
-        if (on) releaseMode()
+        if (on) { releaseMode(); menuOpen = false }
         editing = on
+        bump()
+    }
+
+    // ---- quick menu ----
+
+    @Synchronized
+    fun setMenu(on: Boolean) {
+        if (on == menuOpen) return
+        if (on) {
+            if (editing) return
+            releaseMode()
+            menuIdx = modeIdx.coerceIn(0, maxOf(0, modes.size - 1)) // start on the current mode
+        }
+        menuOpen = on
+        note("menu ${if (on) "open" else "closed"}")
+        bump()
+    }
+
+    private fun menuMove(dir: Int) {
+        menuIdx = QuickMenu.move(menuIdx, dir, QuickMenu.count(modes.size))
+        bump()
+    }
+
+    private fun menuChoose() {
+        when (val item = QuickMenu.item(menuIdx, modes.size)) {
+            is QuickMenu.Item.SetMode -> { setMode(item.index); setMenu(false) }
+            QuickMenu.Item.Overlay -> { overlayOn = !overlayOn; note("overlay ${if (overlayOn) "on" else "off"}") }
+            QuickMenu.Item.Look -> lookSeq++
+            QuickMenu.Item.Edit -> { setMenu(false); setEditing(true); note("editor open") }
+            QuickMenu.Item.Close -> setMenu(false)
+        }
+        bump()
+    }
+
+    /** D-pad as a hat axis (most controllers): -1 = up, 1 = down. Returns true if the menu used it. */
+    private fun menuHat(code: Int, value: Int): Boolean {
+        if (!menuOpen) return false
+        if (code == HAT_Y && value != 0) menuMove(if (value < 0) -1 else 1)
+        return code == HAT_X || code == HAT_Y
+    }
+
+    /** For tests: a d-pad hat movement. */
+    fun feedHatForTest(code: Int, value: Int) {
+        synchronized(this) { menuHat(code, value) }
         bump()
     }
 
@@ -425,8 +484,9 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             3 -> { // EV_ABS
                 r.raw[code] = value
                 active = r
+                if (menuHat(code, value)) bump()
             }
-            0 -> if (code == 0 && active === r && !editing) { // SYN_REPORT
+            0 -> if (code == 0 && active === r && !editing && !menuOpen) { // SYN_REPORT
                 for (s in mode.sticks) stick(injector, r, s)
                 if (ticker == null && mode.sticks.any { it.type == "camera" && hypot(r.norm(it.ax), r.norm(it.ay)) >= it.dead }) startTicker()
             }
@@ -541,10 +601,25 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                     setEditing(!editing)
                     note("editor ${if (editing) "open" else "closed"}")
                 }
+                menuKey -> setMenu(!menuOpen)
             }
             return
         }
         if (value == 0 && suppressed.remove(code)) return
+
+        // ---- quick menu: buttons drive the menu, nothing reaches the game ----
+        if (menuOpen) {
+            if (value == 1) {
+                suppressed.add(code) // its release must not tap either (the menu may be closed by then)
+                when (code) {
+                    QuickMenu.KEY_A -> menuChoose()
+                    QuickMenu.KEY_B -> setMenu(false)
+                    QuickMenu.KEY_DPAD_UP -> menuMove(-1)
+                    QuickMenu.KEY_DPAD_DOWN -> menuMove(1)
+                }
+            }
+            return
+        }
         if (editing || injector == null) return
 
         // ---- normal taps ----
@@ -698,5 +773,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     companion object {
         /** No controller input for this long = sleep (overlay hidden, nothing ticking). */
         const val IDLE_MS = 60_000L
+        const val HAT_X = 0x10
+        const val HAT_Y = 0x11
     }
 }
