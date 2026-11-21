@@ -40,7 +40,7 @@ object QuickMenu {
 
     fun rows(modeNames: List<String>, modeIdx: Int, overlayOn: Boolean, lookName: String): List<Row> {
         val out = ArrayList<Row>()
-        modeNames.forEachIndexed { i, n -> out.add(Row(n, if (i == modeIdx) "current" else "mode", i == modeIdx, false)) }
+        modeNames.forEachIndexed { i, n -> out.add(Row(n, if (i == modeIdx) "current" else "", i == modeIdx, false)) }
         out.add(Row("Overlay", if (overlayOn) "on" else "off", false, true))
         out.add(Row("Look", lookName, false, false))
         out.add(Row("Edit layout", "", false, false))
