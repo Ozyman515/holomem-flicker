@@ -86,7 +86,7 @@ object Raden {
      */
     fun pill(b: Button, fill: Int, text: Int = CREAM, radius: Float = T.R_MD, tonal: Boolean = false) {
         val face = if (tonal) {
-            rounded(mix(CREAM, TEAL, 0.13f), radius, alpha(TEAL, 0x33), T.HAIR)
+            rounded(mix(CREAM, TEAL, 0.16f), radius, alpha(TEAL, 0x40), T.HAIR)
         } else {
             GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
@@ -158,7 +158,7 @@ object Raden {
         }
         val glow = GradientDrawable().apply {
             gradientType = GradientDrawable.RADIAL_GRADIENT
-            colors = intArrayOf(alpha(ORANGE, 0x59), alpha(ORANGE, 0x00))
+            colors = intArrayOf(alpha(mix(TEAL_SOFT, Color.WHITE, 0.5f), 0x4D), alpha(TEAL_SOFT, 0x00))
             gradientRadius = 520f
             setGradientCenter(0.85f, 0.1f)
             cornerRadius = T.R_LG

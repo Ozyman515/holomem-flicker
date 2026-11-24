@@ -142,7 +142,7 @@ class LayoutPainter(private val ctx: Context) {
                 fill.color = Raden.alpha(Raden.NIGHT, 0x80)
                 c.drawCircle(x, y, r, fill)
                 hairline(c, k, x, y, r, sel, 0x40)
-                beamArc(c, k, x, y, r, color, -60f)
+                beamArc(c, k, x, y, r, color, -200f)
                 ring.strokeWidth = 1f * k
                 ring.color = Raden.alpha(Color.WHITE, 0x26)
                 c.drawCircle(x, y, r * 0.62f, ring)
@@ -486,7 +486,7 @@ class LayoutPainter(private val ctx: Context) {
         fill.color = Raden.alpha(Raden.NIGHT, 0xA6)
         c.drawCircle(x, y, r, fill)
         hairline(c, k, x, y, r, sel, 0x4D)
-        beamArc(c, k, x, y, r, glow, -80f)
+        beamArc(c, k, x, y, r, glow, -200f)
         drawLabel(c, k, x, y, r, label, Color.WHITE, 0, 0.9f)
     }
 
@@ -505,15 +505,15 @@ class LayoutPainter(private val ctx: Context) {
             ring.clearShadowLayer()
             return
         }
-        // soft halo first (plain colour, so the shadow is cheap), then the gradient on top
-        ring.color = Raden.alpha(a, 0x66)
-        ring.setShadowLayer(14f * k, 0f, 0f, Raden.alpha(Raden.mix(a, b, 0.5f), 0xB3))
+        // soft wide halo underneath, then a vivid gradient ring on top
+        ring.strokeWidth = width * 3f * k
+        ring.color = Raden.alpha(Raden.mix(a, b, 0.5f), 0x2E)
         c.drawCircle(x, y, r, ring)
-        ring.clearShadowLayer()
-        val sweep = SweepGradient(x, y, intArrayOf(b, a, d, a, b), null)
+        val sweep = SweepGradient(x, y, intArrayOf(b, a, Raden.mix(a, Color.WHITE, 0.35f), a, b), null)
         val m = android.graphics.Matrix()
         m.setRotate(-90f, x, y)
         sweep.setLocalMatrix(m)
+        ring.strokeWidth = (width + 0.5f) * k
         ring.shader = sweep
         c.drawCircle(x, y, r, ring)
         ring.shader = null
@@ -523,9 +523,9 @@ class LayoutPainter(private val ctx: Context) {
     private fun spotlight(c: Canvas, x: Float, y: Float, r: Float, color: Int) {
         fill.color = Raden.alpha(Raden.NIGHT, 0x8C)
         c.drawCircle(x, y, r, fill)
-        fill.shader = RadialGradient(x, y - r * 0.9f, r * 1.5f,
-            intArrayOf(Raden.alpha(Raden.mix(color, Color.WHITE, 0.55f), 0x8C), Raden.alpha(color, 0x26), Raden.alpha(color, 0x00)),
-            floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        fill.shader = RadialGradient(x, y - r * 0.75f, r * 1.35f,
+            intArrayOf(Raden.alpha(Raden.mix(color, Color.WHITE, 0.6f), 0xD9), Raden.alpha(color, 0x59), Raden.alpha(color, 0x00)),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(x, y, r, fill)
         fill.shader = null
     }
@@ -542,15 +542,15 @@ class LayoutPainter(private val ctx: Context) {
     /** A bright arc of light along the edge, fading out at its tail (border-beam effect). */
     private fun beamArc(c: Canvas, k: Float, x: Float, y: Float, r: Float, color: Int, startDeg: Float) {
         rect.set(x - r, y - r, x + r, y + r)
-        val sweepDeg = 110f
-        val sg = SweepGradient(x, y, intArrayOf(Raden.alpha(color, 0x00), Raden.alpha(color, 0xFF), Color.WHITE),
-            floatArrayOf(0f, sweepDeg / 360f * 0.85f, sweepDeg / 360f))
+        val sweepDeg = 150f
+        val sg = SweepGradient(x, y, intArrayOf(Raden.alpha(color, 0x00), Raden.alpha(color, 0xFF), Color.WHITE, Raden.alpha(Color.WHITE, 0x00)),
+            floatArrayOf(0f, sweepDeg / 360f * 0.8f, sweepDeg / 360f * 0.97f, sweepDeg / 360f + 0.01f))
         val m = android.graphics.Matrix()
         m.setRotate(startDeg, x, y)
         sg.setLocalMatrix(m)
-        dots.strokeWidth = 2.5f * k
+        dots.strokeWidth = 3.5f * k
         dots.shader = sg
-        dots.setShadowLayer(8f * k, 0f, 0f, color)
+        dots.setShadowLayer(10f * k, 0f, 0f, color)
         c.drawArc(rect, startDeg, sweepDeg, false, dots)
         dots.clearShadowLayer()
         dots.shader = null
