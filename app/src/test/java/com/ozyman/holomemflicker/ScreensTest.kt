@@ -23,6 +23,15 @@ import java.io.File
 class ScreensTest {
     private val out = File(System.getProperty("screens.dir") ?: "screens").apply { mkdirs() }
 
+    /** Screens are captured straight after opening, so skip the open-up animations. */
+    @org.junit.Before
+    fun noAnimations() {
+        android.provider.Settings.Global.putFloat(
+            RuntimeEnvironment.getApplication().contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 0f
+        )
+    }
+
     private fun save(v: View, name: String, w: Int, h: Int? = null) {
         v.measure(
             View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
@@ -158,7 +167,7 @@ class ScreensTest {
 
     @Test fun editorLive() = editor(0, "3-editor-live")
 
-    /** Every overlay look side by side (Live layout with one swipe point, L1 selected in the last row's tiles). */
+    /** Every overlay look side by side (Live layout with one swipe point; L1 selected in Penlight and Aurora). */
     @Test
     fun looks() {
         val ctx = RuntimeEnvironment.getApplication()
@@ -170,15 +179,16 @@ class ScreensTest {
         l.taps.add(Prefs.TapPoint(0x134, 0.61f, 0.62f))  // Y
         EditorTargets.toggleSwipe(l.taps[2], 1280, 800)  // ThumbL swipes up
         val tw = 1280; val th = 800
-        val bmp = Bitmap.createBitmap(tw * 2, th * 3, Bitmap.Config.ARGB_8888)
+        val cols = 3
+        val bmp = Bitmap.createBitmap(tw * cols, th * ((Looks.ALL.size + cols - 1) / cols), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 44f; color = android.graphics.Color.WHITE; isFakeBoldText = true }
         Looks.ALL.forEachIndexed { i, look ->
             c.save()
-            c.translate((i % 2) * tw.toFloat(), (i / 2) * th.toFloat())
+            c.translate((i % cols) * tw.toFloat(), (i / cols) * th.toFloat())
             c.clipRect(0, 0, tw, th)
             c.drawColor(0xFF2A2340.toInt()) // stand-in for the game
-            LayoutPainter(ctx).draw(c, tw.toFloat(), th.toFloat(), l, if (i >= 4) 0 else Int.MIN_VALUE, look)
+            LayoutPainter(ctx).draw(c, tw.toFloat(), th.toFloat(), l, if (i == 0 || i == 6) 0 else Int.MIN_VALUE, look)
             c.drawText(Looks.NAMES[look]!!, 40f, 70f, p)
             c.restore()
         }

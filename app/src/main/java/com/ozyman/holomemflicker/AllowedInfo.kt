@@ -108,7 +108,7 @@ object AllowedInfo {
         })
         col.addView(Button(ctx).apply {
             text = "Close"
-            Raden.pill(this, Raden.TEAL)
+            Raden.ui(this, Raden.TEAL)
             setOnClickListener { onClose() }
         }, LinearLayout.LayoutParams(-2, -2).apply { gravity = android.view.Gravity.END; topMargin = 10 })
 

@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.SweepGradient
 
 /**
  * Draws a mode's layout (tap points + stick zones). Shared by the editor and the in-game overlay.
@@ -17,7 +18,8 @@ import android.graphics.Shader
  * "Penlight" look: taps are lit round buttons (shine on top, glowing outline), sticks are dark
  * rings with a glowing edge and a faint inner ring, a flick stick shows its reach as a dotted
  * light line with a diamond at each end, and each stick gets a lit label chip underneath.
- * Other styles (main screen → Style, see [Looks]): Minimal, Neon, Bubble, Gamepad, Pixel.
+ * Other styles (main screen → Style, see [Looks]): Minimal, Neon, Bubble, Gamepad, Pixel,
+ * Aurora, Spotlight, Beam.
  * Glow colours follow the member theme: taps use a bright version of the theme's main colour,
  * flicks use the theme's accent. Swipe points get a lit arrow from the circle to where the swipe
  * ends; when selected in an editor the arrow's end has a round handle to aim it.
@@ -53,6 +55,9 @@ class LayoutPainter(private val ctx: Context) {
                 Looks.BUBBLE -> tapBubble(c, k, x, y, r, label, i == selected)
                 Looks.GAMEPAD -> tapGamepad(c, k, x, y, r, label, t.code, i == selected)
                 Looks.PIXEL -> tapPixel(c, k, x, y, r, label, i == selected)
+                Looks.AURORA -> tapAurora(c, k, x, y, r, label, i == selected)
+                Looks.SPOTLIGHT -> tapSpotlight(c, k, x, y, r, label, i == selected)
+                Looks.BEAM -> tapBeam(c, k, x, y, r, label, i == selected)
                 else -> tapPenlight(c, k, x, y, r, label, i == selected)
             }
         }
@@ -114,6 +119,34 @@ class LayoutPainter(private val ctx: Context) {
                 ring.color = Raden.alpha(Color.WHITE, 0x40)
                 c.drawCircle(x, y, cap * 0.72f, ring)
                 if (type == "camera") cross(c, k, x, y, cap * 0.45f, color, 2f)
+            }
+            Looks.AURORA -> {
+                fill.shader = RadialGradient(x, y, r, intArrayOf(Raden.alpha(Raden.NIGHT, 0x33), Raden.alpha(Raden.NIGHT, 0x8C), Raden.alpha(color, 0x33)),
+                    floatArrayOf(0f, 0.75f, 1f), Shader.TileMode.CLAMP)
+                c.drawCircle(x, y, r, fill)
+                fill.shader = null
+                auroraRing(c, k, x, y, r, 3f, sel)
+                ring.strokeWidth = 1f * k
+                ring.color = Raden.alpha(Color.WHITE, 0x33)
+                c.drawCircle(x, y, r * 0.62f, ring)
+                if (type == "camera") cross(c, k, x, y, r * 0.4f, Raden.alpha(Color.WHITE, 0xB3), 2f)
+            }
+            Looks.SPOTLIGHT -> {
+                spotlight(c, x, y, r, color)
+                hairline(c, k, x, y, r, sel, 0x73)
+                fill.color = Raden.alpha(Color.WHITE, 0xCC)
+                c.drawCircle(x, y, 2.5f * k, fill)
+                if (type == "camera") cross(c, k, x, y, r * 0.35f, Raden.alpha(Color.WHITE, 0x99), 1.5f)
+            }
+            Looks.BEAM -> {
+                fill.color = Raden.alpha(Raden.NIGHT, 0x80)
+                c.drawCircle(x, y, r, fill)
+                hairline(c, k, x, y, r, sel, 0x40)
+                beamArc(c, k, x, y, r, color, -60f)
+                ring.strokeWidth = 1f * k
+                ring.color = Raden.alpha(Color.WHITE, 0x26)
+                c.drawCircle(x, y, r * 0.62f, ring)
+                if (type == "camera") cross(c, k, x, y, r * 0.35f, color, 1.5f)
             }
             Looks.PIXEL -> {
                 val px = pixelSize(k)
@@ -194,6 +227,21 @@ class LayoutPainter(private val ctx: Context) {
                     d += 18f * k
                 }
             }
+            Looks.AURORA, Looks.SPOTLIGHT, Looks.BEAM -> {
+                // a line of light fading out towards each end, with a small soft dot at the reach
+                dots.strokeWidth = (if (look == Looks.AURORA) 3f else 1.5f) * k
+                val end = if (look == Looks.AURORA) neonPartner(color) else Raden.alpha(Color.WHITE, 0x00)
+                dots.shader = LinearGradient(x + gap, y, x + reach, y, Raden.alpha(color, 0xE6), Raden.alpha(end, 0x40), Shader.TileMode.CLAMP)
+                c.drawLine(x + gap, y, x + reach, y, dots)
+                dots.shader = LinearGradient(x - gap, y, x - reach, y, Raden.alpha(color, 0xE6), Raden.alpha(end, 0x40), Shader.TileMode.CLAMP)
+                c.drawLine(x - gap, y, x - reach, y, dots)
+                dots.shader = null
+                fill.color = if (look == Looks.AURORA) neonPartner(color) else color
+                fill.setShadowLayer(8f * k, 0f, 0f, fill.color)
+                c.drawCircle(x - reach, y, 3.5f * k, fill)
+                c.drawCircle(x + reach, y, 3.5f * k, fill)
+                fill.clearShadowLayer()
+            }
             Looks.PIXEL -> {
                 val px = pixelSize(k)
                 fill.color = color
@@ -253,6 +301,47 @@ class LayoutPainter(private val ctx: Context) {
                 ring.strokeWidth = 1.5f * k
                 ring.color = Raden.alpha(color, 0xCC)
                 c.drawRoundRect(rect, 5f * k, 5f * k, ring)
+                text.color = Color.WHITE
+                c.drawText(label, x, rect.centerY() + text.textSize * 0.36f, text)
+            }
+            Looks.AURORA -> {
+                text.textSize = 10.5f * k
+                text.letterSpacing = 0.16f
+                val tw = text.measureText(label)
+                rect.set(x - tw / 2 - 12f * k, top, x + tw / 2 + 12f * k, top + 21f * k)
+                fill.color = Raden.alpha(Raden.NIGHT, 0xCC)
+                c.drawRoundRect(rect, 10.5f * k, 10.5f * k, fill)
+                ring.strokeWidth = 1.5f * k
+                ring.shader = LinearGradient(rect.left, 0f, rect.right, 0f, color, neonPartner(color), Shader.TileMode.CLAMP)
+                c.drawRoundRect(rect, 10.5f * k, 10.5f * k, ring)
+                ring.shader = null
+                text.color = Color.WHITE
+                c.drawText(label, x, rect.centerY() + text.textSize * 0.36f, text)
+            }
+            Looks.SPOTLIGHT -> {
+                text.textSize = 10f * k
+                text.letterSpacing = 0.18f
+                text.color = Raden.alpha(Color.WHITE, 0xD9)
+                val tw = text.measureText(label)
+                fill.color = color
+                c.drawCircle(x - tw / 2 - 8f * k, top + 8.5f * k, 2.5f * k, fill)
+                c.drawText(label, x, top + 12f * k, text)
+            }
+            Looks.BEAM -> {
+                text.textSize = 10f * k
+                text.letterSpacing = 0.16f
+                val tw = text.measureText(label)
+                rect.set(x - tw / 2 - 10f * k, top, x + tw / 2 + 10f * k, top + 20f * k)
+                fill.color = Raden.alpha(Raden.NIGHT, 0xB3)
+                c.drawRoundRect(rect, 6f * k, 6f * k, fill)
+                ring.strokeWidth = 1f * k
+                ring.color = Raden.alpha(Color.WHITE, 0x40)
+                c.drawRoundRect(rect, 6f * k, 6f * k, ring)
+                dots.strokeWidth = 1.5f * k
+                dots.color = color
+                dots.setShadowLayer(4f * k, 0f, 0f, color)
+                c.drawLine(rect.left + 6f * k, rect.top, rect.left + rect.width() * 0.45f, rect.top, dots)
+                dots.clearShadowLayer()
                 text.color = Color.WHITE
                 c.drawText(label, x, rect.centerY() + text.textSize * 0.36f, text)
             }
@@ -372,7 +461,100 @@ class LayoutPainter(private val ctx: Context) {
         text.typeface = android.graphics.Typeface.DEFAULT
     }
 
+    /** Aurora: smoky glass with a colour-shifting gradient ring and a soft halo. */
+    private fun tapAurora(c: Canvas, k: Float, x: Float, y: Float, r: Float, label: String, sel: Boolean) {
+        val glow = tapGlow()
+        fill.shader = RadialGradient(x, y - r * 0.35f, r * 1.2f,
+            intArrayOf(Raden.alpha(Raden.mix(glow, Color.WHITE, 0.3f), 0x47), Raden.alpha(Raden.NIGHT, 0xA6)),
+            null, Shader.TileMode.CLAMP)
+        c.drawCircle(x, y, r, fill)
+        fill.shader = null
+        auroraRing(c, k, x, y, r, 3f, sel)
+        drawLabel(c, k, x, y, r, label, Color.WHITE, glow)
+    }
+
+    /** Spotlight: a light shining down from above the button, hairline edge. */
+    private fun tapSpotlight(c: Canvas, k: Float, x: Float, y: Float, r: Float, label: String, sel: Boolean) {
+        spotlight(c, x, y, r, tapGlow())
+        hairline(c, k, x, y, r, sel, 0x8C)
+        drawLabel(c, k, x, y, r, label, Color.WHITE, 0, 0.9f)
+    }
+
+    /** Beam: dark hairline circle with a bright beam of light along the top-right edge. */
+    private fun tapBeam(c: Canvas, k: Float, x: Float, y: Float, r: Float, label: String, sel: Boolean) {
+        val glow = tapGlow()
+        fill.color = Raden.alpha(Raden.NIGHT, 0xA6)
+        c.drawCircle(x, y, r, fill)
+        hairline(c, k, x, y, r, sel, 0x4D)
+        beamArc(c, k, x, y, r, glow, -80f)
+        drawLabel(c, k, x, y, r, label, Color.WHITE, 0, 0.9f)
+    }
+
     // ---------- shared bits for the looks ----------
+
+    /** Gradient ring that runs around the theme's colours (accent → glow → second colour → accent). */
+    private fun auroraRing(c: Canvas, k: Float, x: Float, y: Float, r: Float, width: Float, sel: Boolean) {
+        val a = tapGlow()
+        val b = Raden.ORANGE
+        val d = neonPartner(a)
+        ring.strokeWidth = width * k
+        if (sel) {
+            ring.color = Color.WHITE
+            ring.setShadowLayer(16f * k, 0f, 0f, Raden.CRIMSON)
+            c.drawCircle(x, y, r, ring)
+            ring.clearShadowLayer()
+            return
+        }
+        // soft halo first (plain colour, so the shadow is cheap), then the gradient on top
+        ring.color = Raden.alpha(a, 0x66)
+        ring.setShadowLayer(14f * k, 0f, 0f, Raden.alpha(Raden.mix(a, b, 0.5f), 0xB3))
+        c.drawCircle(x, y, r, ring)
+        ring.clearShadowLayer()
+        val sweep = SweepGradient(x, y, intArrayOf(b, a, d, a, b), null)
+        val m = android.graphics.Matrix()
+        m.setRotate(-90f, x, y)
+        sweep.setLocalMatrix(m)
+        ring.shader = sweep
+        c.drawCircle(x, y, r, ring)
+        ring.shader = null
+    }
+
+    /** Radial light from above-centre fading out, over a dark base. */
+    private fun spotlight(c: Canvas, x: Float, y: Float, r: Float, color: Int) {
+        fill.color = Raden.alpha(Raden.NIGHT, 0x8C)
+        c.drawCircle(x, y, r, fill)
+        fill.shader = RadialGradient(x, y - r * 0.9f, r * 1.5f,
+            intArrayOf(Raden.alpha(Raden.mix(color, Color.WHITE, 0.55f), 0x8C), Raden.alpha(color, 0x26), Raden.alpha(color, 0x00)),
+            floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(x, y, r, fill)
+        fill.shader = null
+    }
+
+    /** Thin white edge (or the selected look: white with a crimson glow). */
+    private fun hairline(c: Canvas, k: Float, x: Float, y: Float, r: Float, sel: Boolean, a: Int) {
+        ring.strokeWidth = (if (sel) 2.5f else 1.2f) * k
+        ring.color = if (sel) Color.WHITE else Raden.alpha(Color.WHITE, a)
+        if (sel) ring.setShadowLayer(14f * k, 0f, 0f, Raden.CRIMSON)
+        c.drawCircle(x, y, r, ring)
+        ring.clearShadowLayer()
+    }
+
+    /** A bright arc of light along the edge, fading out at its tail (border-beam effect). */
+    private fun beamArc(c: Canvas, k: Float, x: Float, y: Float, r: Float, color: Int, startDeg: Float) {
+        rect.set(x - r, y - r, x + r, y + r)
+        val sweepDeg = 110f
+        val sg = SweepGradient(x, y, intArrayOf(Raden.alpha(color, 0x00), Raden.alpha(color, 0xFF), Color.WHITE),
+            floatArrayOf(0f, sweepDeg / 360f * 0.85f, sweepDeg / 360f))
+        val m = android.graphics.Matrix()
+        m.setRotate(startDeg, x, y)
+        sg.setLocalMatrix(m)
+        dots.strokeWidth = 2.5f * k
+        dots.shader = sg
+        dots.setShadowLayer(8f * k, 0f, 0f, color)
+        c.drawArc(rect, startDeg, sweepDeg, false, dots)
+        dots.clearShadowLayer()
+        dots.shader = null
+    }
 
     /** Glossy glass bubble (Bubble look). */
     private fun glass(c: Canvas, k: Float, x: Float, y: Float, r: Float, color: Int, sel: Boolean) {

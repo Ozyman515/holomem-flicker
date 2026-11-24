@@ -129,7 +129,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(56, 40, 56, 40)
-            background = Raden.rounded(Raden.TEAL, 44f)
+            Raden.banner(this)
         }
         header.addView(TextView(this).apply {
             text = "Holomem Flicker"
@@ -186,10 +186,10 @@ class MainActivity : Activity() {
             setTextColor(Raden.INK)
             setPadding(0, 10, 0, 10)
         }.also { cur.addView(it) }
-        fun styled(b: Button, fill: Int) = b.also { Raden.pill(it, fill) }
+        fun styled(b: Button, fill: Int) = b.also { Raden.ui(it, fill) }
         fun button(s: String, fill: Int = Raden.TEAL, onClick: () -> Unit): Button = Button(this).apply {
             text = s
-            Raden.pill(this, fill)
+            Raden.ui(this, fill)
             setOnClickListener { onClick() }
         }.also { cur.addView(it, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 10; bottomMargin = 6 }) }
         fun row(vararg bs: Button) {
@@ -248,7 +248,7 @@ class MainActivity : Activity() {
         row(*Prefs.MODE_NAMES.mapIndexed { i, name ->
             Button(this).apply {
                 text = name
-                Raden.pill(this, Raden.TEAL)
+                Raden.ui(this, Raden.TEAL)
                 setOnClickListener { pickMode(i) }
             }.also { modeBtns.add(it) }
         }.toTypedArray())
@@ -276,7 +276,7 @@ class MainActivity : Activity() {
         fun showLook() {
             val now = Looks.current(this)
             lookText.text = "${Looks.NAMES[now]}: ${Looks.BLURBS[now]}"
-            Looks.ALL.forEachIndexed { j, key -> Raden.pill(lookBtns[j], if (key == now) Raden.CRIMSON else Raden.TEAL) }
+            Looks.ALL.forEachIndexed { j, key -> Raden.ui(lookBtns[j], if (key == now) Raden.CRIMSON else Raden.TEAL) }
             lookPreview.invalidate()
         }
         for (chunk in Looks.ALL.chunked(3)) row(*chunk.map { key ->
@@ -396,6 +396,7 @@ class MainActivity : Activity() {
             setMargins(0, 56, 76, 0)
         })
         setContentView(root)
+        Motion.enter((0 until col.childCount).map { col.getChildAt(it) })
 
         Shizuku.addBinderReceivedListenerSticky(binderListener)
         Shizuku.addBinderDeadListener(deadListener)
@@ -544,7 +545,7 @@ class MainActivity : Activity() {
     private fun updateModeText() {
         val i = Prefs.getInt(this, Prefs.MODE, 0)
         modeText.text = "Current mode: ${Prefs.MODE_NAMES.getOrElse(i) { "?" }}"
-        modeBtns.forEachIndexed { j, b -> Raden.pill(b, if (j == i) Raden.CRIMSON else Raden.TEAL) }
+        modeBtns.forEachIndexed { j, b -> Raden.ui(b, if (j == i) Raden.CRIMSON else Raden.TEAL) }
     }
 
     private var updateSha: String? = null

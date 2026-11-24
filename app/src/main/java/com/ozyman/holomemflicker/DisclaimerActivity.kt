@@ -95,7 +95,7 @@ class DisclaimerActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(56, 36, 56, 36)
-            background = Raden.rounded(Raden.TEAL, 44f)
+            Raden.banner(this)
         }
         header.addView(TextView(this).apply {
             text = "Disclaimer"
@@ -149,7 +149,7 @@ class DisclaimerActivity : Activity() {
         fun btn(label: String, fill: Int, f: () -> Unit) = bar.addView(Button(this).apply {
             text = label
             isAllCaps = false
-            Raden.pill(this, fill)
+            Raden.ui(this, fill)
             setOnClickListener { f() }
         }, LinearLayout.LayoutParams(-2, -2).apply { setMargins(12, 28, 0, 0) })
         if (mustAccept) {

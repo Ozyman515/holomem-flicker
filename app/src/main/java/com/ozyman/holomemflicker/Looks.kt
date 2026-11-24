@@ -15,8 +15,11 @@ object Looks {
     const val BUBBLE = "bubble"
     const val GAMEPAD = "gamepad"
     const val PIXEL = "pixel"
+    const val AURORA = "aurora"
+    const val SPOTLIGHT = "spotlight"
+    const val BEAM = "beam"
 
-    val ALL = listOf(PENLIGHT, MINIMAL, NEON, BUBBLE, GAMEPAD, PIXEL)
+    val ALL = listOf(PENLIGHT, MINIMAL, NEON, BUBBLE, GAMEPAD, PIXEL, AURORA, SPOTLIGHT, BEAM)
 
     val NAMES = mapOf(
         PENLIGHT to "Penlight",
@@ -24,7 +27,10 @@ object Looks {
         NEON to "Neon",
         BUBBLE to "Bubble",
         GAMEPAD to "Gamepad",
-        PIXEL to "Pixel"
+        PIXEL to "Pixel",
+        AURORA to "Aurora",
+        SPOTLIGHT to "Spotlight",
+        BEAM to "Beam"
     )
 
     val BLURBS = mapOf(
@@ -33,7 +39,10 @@ object Looks {
         NEON to "Hollow double rings in two theme colours with a strong glow.",
         BUBBLE to "Glossy see-through bubbles with a white shine, like the theme picker.",
         GAMEPAD to "Solid controller buttons (A green, B red, X blue, Y yellow) and thumbstick caps.",
-        PIXEL to "Chunky 8-bit blocks and a monospace font."
+        PIXEL to "Chunky 8-bit blocks and a monospace font.",
+        AURORA to "Smoky glass buttons ringed with a colour-shifting gradient and a soft halo.",
+        SPOTLIGHT to "A light shining down on each button, with crisp hairline edges.",
+        BEAM to "Dark hairline circles with a bright beam of light running along the edge."
     )
 
     fun current(ctx: Context): String = Prefs.getStr(ctx, PREF, PENLIGHT).takeIf { it in ALL } ?: PENLIGHT

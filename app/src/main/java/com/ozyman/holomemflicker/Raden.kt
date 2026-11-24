@@ -63,37 +63,107 @@ object Raden {
             if (strokeW > 0) setStroke(strokeW, stroke)
         }
 
-    /** Pill button in one of the palette colours. */
-    fun pill(b: Button, fill: Int, text: Int = CREAM, radius: Float = 60f) {
+    /**
+     * Design tokens (spacing, corners, type) in the spirit of Meta's Astryx design system:
+     * one small scale used everywhere so every screen lines up.
+     */
+    object T {
+        const val R_SM = 16f     // chips, small controls
+        const val R_MD = 26f     // buttons
+        const val R_LG = 40f     // cards, header
+        const val HAIR = 2       // hairline borders
+        const val PAD_X = 40     // button padding
+        const val PAD_Y = 22
+        const val TITLE = 19f
+        const val BODY = 16f
+        const val CAPTION = 13f
+    }
+
+    /**
+     * Button in one of the palette colours: solid, with a faint top highlight.
+     * [tonal] (light screens only): the theme's main colour as a soft tinted fill with coloured
+     * text, so the solid accent / alert buttons stand out as the important ones.
+     */
+    fun pill(b: Button, fill: Int, text: Int = CREAM, radius: Float = T.R_MD, tonal: Boolean = false) {
+        val face = if (tonal) {
+            rounded(mix(CREAM, TEAL, 0.13f), radius, alpha(TEAL, 0x33), T.HAIR)
+        } else {
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(mix(fill, Color.WHITE, 0.10f), fill)
+            ).apply {
+                cornerRadius = radius
+                setStroke(T.HAIR, mix(fill, Color.BLACK, 0.12f))
+            }
+        }
         b.background = RippleDrawable(
-            ColorStateList.valueOf(alpha(Color.WHITE, 0x55)),
-            rounded(fill, radius, alpha(Color.BLACK, 0x22), 2),
-            null
+            ColorStateList.valueOf(alpha(if (tonal) TEAL else Color.WHITE, 0x40)), face, null
         )
-        b.setTextColor(text)
+        b.setTextColor(if (tonal) TEAL_DEEP else text)
         b.isAllCaps = false
         b.typeface = Typeface.DEFAULT_BOLD
+        b.letterSpacing = 0.01f
         b.stateListAnimator = null
         b.elevation = 0f
-        b.setPadding(36, 18, 36, 18)
+        b.setPadding(T.PAD_X, T.PAD_Y, T.PAD_X, T.PAD_Y)
         b.minHeight = 0
         b.minimumHeight = 0
+        Motion.press(b)
     }
+
+    /** Light-screen button: the theme's main colour comes out tonal, anything else solid. */
+    fun ui(b: Button, fill: Int) = pill(b, fill, tonal = fill == TEAL)
 
     fun seek(s: SeekBar) {
         s.progressTintList = ColorStateList.valueOf(ORANGE)
-        s.progressBackgroundTintList = ColorStateList.valueOf(MINT_LINE)
-        s.thumbTintList = ColorStateList.valueOf(CRIMSON)
+        s.progressBackgroundTintList = ColorStateList.valueOf(mix(MINT_LINE, CREAM, 0.2f))
+        s.thumbTintList = ColorStateList.valueOf(ORANGE_DEEP)
     }
 
+    /** Card: cream surface, hairline border and a soft tinted shadow underneath. */
     fun card(v: View) {
-        v.background = rounded(CREAM, 36f, MINT_LINE, 4)
+        val shadow = rounded(alpha(TEAL_DEEP, 0x14), T.R_LG)
+        val face = rounded(CREAM, T.R_LG, mix(MINT_LINE, CREAM, 0.35f), T.HAIR)
+        v.background = android.graphics.drawable.LayerDrawable(arrayOf(shadow, face)).apply {
+            setLayerInset(0, 0, 6, 0, 0)
+            setLayerInset(1, 0, 0, 0, 6)
+        }
+        v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, v.paddingBottom + 6)
         v.elevation = 0f
     }
 
-    fun heading(t: TextView, size: Float = 19f) {
+    fun heading(t: TextView, size: Float = T.TITLE) {
         t.setTextColor(TEAL_DEEP)
         t.textSize = size
+        t.typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        t.letterSpacing = -0.01f
+    }
+
+    /** Small all-caps label above a heading (e.g. "SETTINGS"). */
+    fun eyebrow(t: TextView) {
+        t.setTextColor(ORANGE_DEEP)
+        t.textSize = 12f
         t.typeface = Typeface.DEFAULT_BOLD
+        t.letterSpacing = 0.14f
+        t.isAllCaps = true
+    }
+
+    /**
+     * Header banner: diagonal gradient in the theme's deep/main colours with a soft glow of the
+     * accent colour in the top-right corner (Aceternity-style spotlight, drawn once - no animation).
+     */
+    fun banner(v: View) {
+        val base = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(TEAL_DEEP, TEAL, mix(TEAL, TEAL_SOFT, 0.5f))).apply {
+            cornerRadius = T.R_LG
+        }
+        val glow = GradientDrawable().apply {
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            colors = intArrayOf(alpha(ORANGE, 0x59), alpha(ORANGE, 0x00))
+            gradientRadius = 520f
+            setGradientCenter(0.85f, 0.1f)
+            cornerRadius = T.R_LG
+        }
+        val edge = rounded(Color.TRANSPARENT, T.R_LG, alpha(Color.WHITE, 0x26), T.HAIR)
+        v.background = android.graphics.drawable.LayerDrawable(arrayOf(base, glow, edge))
     }
 }
