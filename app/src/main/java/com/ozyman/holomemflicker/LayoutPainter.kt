@@ -464,9 +464,14 @@ class LayoutPainter(private val ctx: Context) {
     /** Aurora: smoky glass with a colour-shifting gradient ring and a soft halo. */
     private fun tapAurora(c: Canvas, k: Float, x: Float, y: Float, r: Float, label: String, sel: Boolean) {
         val glow = tapGlow()
-        fill.shader = RadialGradient(x, y - r * 0.35f, r * 1.2f,
-            intArrayOf(Raden.alpha(Raden.mix(glow, Color.WHITE, 0.3f), 0x47), Raden.alpha(Raden.NIGHT, 0xA6)),
-            null, Shader.TileMode.CLAMP)
+        fill.color = Raden.alpha(Raden.NIGHT, 0xB3)
+        c.drawCircle(x, y, r, fill)
+        // two soft colour clouds inside the glass: theme glow from the top, accent from below
+        fill.shader = RadialGradient(x - r * 0.25f, y - r * 0.45f, r * 1.0f,
+            Raden.alpha(glow, 0x66), Raden.alpha(glow, 0x00), Shader.TileMode.CLAMP)
+        c.drawCircle(x, y, r, fill)
+        fill.shader = RadialGradient(x + r * 0.3f, y + r * 0.5f, r * 0.9f,
+            Raden.alpha(Raden.ORANGE, 0x4D), Raden.alpha(Raden.ORANGE, 0x00), Shader.TileMode.CLAMP)
         c.drawCircle(x, y, r, fill)
         fill.shader = null
         auroraRing(c, k, x, y, r, 3f, sel)
@@ -505,17 +510,31 @@ class LayoutPainter(private val ctx: Context) {
             ring.clearShadowLayer()
             return
         }
-        // soft wide halo underneath, then a vivid gradient ring on top
-        ring.strokeWidth = width * 3f * k
-        ring.color = Raden.alpha(Raden.mix(a, b, 0.5f), 0x2E)
+        // glow: a coloured shadow around a faint ring (one shadow pass, cheap)
+        val mid = Raden.mix(a, b, 0.5f)
+        ring.strokeWidth = 2f * k
+        ring.color = Raden.alpha(mid, 0x80)
+        ring.setShadowLayer(18f * k, 0f, 0f, Raden.alpha(mid, 0xD9))
         c.drawCircle(x, y, r, ring)
-        val sweep = SweepGradient(x, y, intArrayOf(b, a, Raden.mix(a, Color.WHITE, 0.35f), a, b), null)
+        ring.clearShadowLayer()
+        // main ring: full-strength sweep through accent → glow → crimson → light → accent
         val m = android.graphics.Matrix()
         m.setRotate(-90f, x, y)
+        val sweep = SweepGradient(x, y,
+            intArrayOf(b, a, Raden.CRIMSON, Raden.mix(a, Color.WHITE, 0.5f), b), null)
         sweep.setLocalMatrix(m)
-        ring.strokeWidth = (width + 0.5f) * k
+        ring.strokeWidth = (width + 1.5f) * k
         ring.shader = sweep
         c.drawCircle(x, y, r, ring)
+        // thin inner echo of the same colours, turned half a circle, for the "aurora" banding
+        val echo = SweepGradient(x, y,
+            intArrayOf(Raden.alpha(a, 0x99), Raden.alpha(b, 0x99), Raden.alpha(Raden.CRIMSON, 0x99), Raden.alpha(a, 0x99)), null)
+        val m2 = android.graphics.Matrix()
+        m2.setRotate(90f, x, y)
+        echo.setLocalMatrix(m2)
+        ring.strokeWidth = 1.2f * k
+        ring.shader = echo
+        c.drawCircle(x, y, r - (width + 3f) * k, ring)
         ring.shader = null
     }
 
