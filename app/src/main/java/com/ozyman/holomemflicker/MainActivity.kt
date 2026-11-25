@@ -240,6 +240,13 @@ class MainActivity : Activity() {
             startActivity(Intent(this, ControllerTestActivity::class.java))
         }
 
+        section("Minigames")
+        label("Puka Puka Fight: set up the board and the coach shows the best move. Drag or tap pieces to play.", 14f)
+            .setTextColor(Raden.INK_SOFT)
+        button("Puka Puka Coach") {
+            startActivity(Intent(this, PukaCoachActivity::class.java))
+        }
+
         section("Modes")
         label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode, Select + Start to edit.", 14f)
             .setTextColor(Raden.INK_SOFT)

@@ -621,6 +621,12 @@
         <!-- THEME-ALIASES:END -->
 
         <activity
+            android:name=".PukaCoachActivity"
+            android:exported="false"
+            android:label="Puka Puka Coach"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation" />
+
+        <activity
             android:name=".DisclaimerActivity"
             android:exported="false" />
 

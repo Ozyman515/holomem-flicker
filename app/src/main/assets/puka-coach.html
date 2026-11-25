@@ -1,0 +1,309 @@
+<title>Puka Puka Coach</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: lagoon-tile board on the left, coach panel on the right; stacks on phones. */
+:root{
+ --bg:#eef7f8; --surface:#ffffff; --ink:#123a44; --muted:#557680; --line:#c9e2e6;
+ --sea:#2fb3c6; --sea-deep:#0f7f93; --you:#ff8a5b; --opp:#6c63d9; --hint:#ffd24a; --good:#1f9d6b; --bad:#d64545;
+ --tile-a:#d9f1f4; --tile-b:#c7e9ee;
+ --display:"Baloo 2",system-ui,sans-serif; --body:"Nunito",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+ --bg:#0c1d22; --surface:#13292f; --ink:#dff3f6; --muted:#8fb2ba; --line:#24454d;
+ --sea:#3cc5d8; --sea-deep:#7fdbe8; --you:#ff9a70; --opp:#9a92ff; --hint:#ffd24a; --good:#4fd39b; --bad:#ff7373;
+ --tile-a:#16343b; --tile-b:#1b3d45; color-scheme:dark}}
+:root[data-theme="dark"]{
+ --bg:#0c1d22; --surface:#13292f; --ink:#dff3f6; --muted:#8fb2ba; --line:#24454d;
+ --sea:#3cc5d8; --sea-deep:#7fdbe8; --you:#ff9a70; --opp:#9a92ff; --hint:#ffd24a; --good:#4fd39b; --bad:#ff7373;
+ --tile-a:#16343b; --tile-b:#1b3d45; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1040px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:16px}
+h1{font-family:var(--display);font-weight:800;font-size:2rem;margin:0;color:var(--sea-deep);letter-spacing:-.01em}
+header p{margin:0;color:var(--muted)}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:820px){.main{grid-template-columns:minmax(0,1fr)}}
+.boardcol{display:flex;flex-direction:column;gap:10px;align-items:center}
+.benches{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:460px}
+.hand{display:flex;gap:8px;align-items:center;min-height:62px;width:100%;min-width:0;padding:6px 10px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.hand .lab{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);width:48px;flex:none}
+.hand .slots{display:flex;gap:6px;flex-wrap:wrap}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%;max-width:460px;aspect-ratio:4/3;padding:8px;border-radius:20px;background:linear-gradient(90deg,color-mix(in srgb,var(--you) 22%,var(--surface)),var(--surface) 25%,var(--surface) 75%,color-mix(in srgb,var(--opp) 22%,var(--surface)));border:1px solid var(--line)}
+.cell{position:relative;border-radius:14px;background:var(--tile-a);border:none;padding:0;cursor:pointer;display:grid;place-items:center;min-width:0}
+.cell:nth-child(odd){background:var(--tile-b)}
+.cell:focus-visible,.pc:focus-visible,button:focus-visible{outline:3px solid var(--sea);outline-offset:2px}
+.cell.sel{box-shadow:inset 0 0 0 3px var(--sea)}
+.cell.tgt::after{content:"";position:absolute;width:22%;aspect-ratio:1;border-radius:50%;background:var(--sea);opacity:.55}
+.cell.hfrom{box-shadow:inset 0 0 0 3px var(--hint)}
+.cell.hto{box-shadow:inset 0 0 0 4px var(--hint);background:color-mix(in srgb,var(--hint) 30%,var(--tile-a))}
+.cell.last{box-shadow:inset 0 0 0 2px var(--muted)}
+.pc{width:82%;aspect-ratio:1;border-radius:22%;display:grid;place-items:center;position:relative;color:#fff;font-family:var(--display);font-weight:800;font-size:clamp(.8rem,3.4vw,1.15rem);line-height:1;border:none;padding:0;cursor:inherit}
+.pc.you{background:var(--you)}.pc.opp{background:var(--opp)}
+.pc .nm{font-size:clamp(.5rem,1.5vw,.74rem);letter-spacing:0}
+.hand .pc .nm,.palette .pc .nm{font-size:.56rem}
+.pc .dot{position:absolute;width:10%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.9)}
+.hand .pc{width:46px;cursor:pointer}
+.hand .pc .ct{position:absolute;right:-6px;bottom:-6px;background:var(--ink);color:var(--bg);font-family:var(--mono);font-size:.7rem;border-radius:999px;padding:1px 5px}
+.hand .pc.sel{box-shadow:0 0 0 3px var(--sea)}
+.hand .pc.hfrom{box-shadow:0 0 0 3px var(--hint)}
+.panel{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.b{font-family:var(--body);font-weight:700;font-size:.9rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 14px;cursor:pointer}
+button.b.primary{background:var(--sea-deep);border-color:var(--sea-deep);color:var(--bg)}
+button.b.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.b:disabled{opacity:.45;cursor:default}
+.verdict{font-family:var(--display);font-weight:800;font-size:1.35rem;margin:6px 0 2px}
+.verdict.win{color:var(--good)}.verdict.lose{color:var(--bad)}
+.meta{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.turn{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.sw{width:12px;height:12px;border-radius:4px;display:inline-block}
+.palette{display:flex;gap:6px;flex-wrap:wrap}
+.palette .pc{width:44px;cursor:pointer}
+.palette .pc.picked{box-shadow:0 0 0 3px var(--sea)}
+.palette .erase{width:44px;aspect-ratio:1;border-radius:10px;border:2px dashed var(--muted);background:none;color:var(--muted);font-weight:800;cursor:pointer}
+.palette .erase.picked{border-style:solid;border-color:var(--sea);color:var(--sea)}
+h2{font-family:var(--display);font-size:1.15rem;margin:0 0 6px;color:var(--sea-deep)}
+.tips{margin:0;padding-left:1.1em;display:grid;gap:6px}
+.tips li{max-width:62ch}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}
+.legend div{display:flex;gap:8px;align-items:center;font-size:.85rem;min-width:0}
+.legend .pc{width:38px;flex:none}
+.status{font-size:.9rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.cell.hto{animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{box-shadow:inset 0 0 0 6px var(--hint)}}}
+[data-drag]{touch-action:none;cursor:grab}
+[data-drag] .pc,.pc[data-drag]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pc.lifted{opacity:.3}
+.pc.ghost{position:fixed;z-index:50;pointer-events:none;transform:translate(-50%,-50%) scale(1.12);box-shadow:0 10px 24px rgba(0,0,0,.28);cursor:grabbing}
+.cell.over{outline:3px dashed var(--ink);outline-offset:-4px}
+.cell.tgt.over{outline-color:var(--sea)}
+</style>
+<div class="wrap">
+<header><h1>Puka Puka Coach</h1><p>Set up the board, then ask for the best move. Laid out like the game: your side is on the left (orange) and attacks to the right.</p></header>
+<div class="main">
+ <div class="boardcol">
+  <div class="board" id="board" role="grid" aria-label="Puka Puka board"></div>
+  <div class="benches">
+   <div class="hand" id="hand0"><span class="lab">Your bench</span><div class="slots"></div></div>
+   <div class="hand" id="hand1"><span class="lab">Their bench</span><div class="slots"></div></div>
+  </div>
+ </div>
+ <div class="panel">
+  <div class="card">
+   <div class="row" style="justify-content:space-between">
+    <span class="turn" id="turn"></span>
+    <div class="row"><button class="b" id="mPlay">Play</button><button class="b" id="mSetup">Set up</button></div>
+   </div>
+   <div id="analysis"><div class="verdict" id="verdict">Ask for a move</div><div id="advice" class="status">The coach searches the game tree for about a second and a half.</div><div class="meta" id="meta"></div></div>
+   <div class="row" style="margin-top:10px">
+    <button class="b primary" id="best">Best move</button>
+    <button class="b" id="playit" disabled>Play it</button>
+    <button class="b" id="undo">Undo</button>
+    <button class="b" id="flip">Switch turn</button>
+    <button class="b" id="reset">New game</button>
+   </div>
+   <p class="status" id="help" style="margin:10px 0 0"></p>
+  </div>
+  <div class="card" id="setupCard" hidden>
+   <h2>Set up the board</h2>
+   <p class="status" style="margin:0 0 8px">Pick a piece, then tap a square. Use the + and − buttons for the benches.</p>
+   <div class="palette" id="palYou"></div>
+   <div class="palette" id="palOpp" style="margin-top:6px"></div>
+   <div class="row" style="margin-top:10px" id="benchEdit"></div>
+   <div class="row" style="margin-top:10px"><button class="b" id="clear">Clear board</button></div>
+  </div>
+  <div class="card">
+   <h2>How the pieces move</h2>
+   <div class="legend" id="legend"></div>
+   <p class="status" style="margin:8px 0 0">Dots on each piece show the squares it can step to. A Turtle that walks onto the far-right column turns gold. A knocked-off holomem joins the bench of whoever knocked it off, and a Gold Turtle goes back to a plain Turtle.</p>
+  </div>
+  <div class="card">
+   <h2>Game plan</h2>
+   <ul class="tips">
+    <li><b>Two ways to win:</b> knock off their Leader, or walk your Leader onto their back column (far right) and survive their next turn (a Try).</li>
+    <li><b>The bench decides games.</b> Every piece you knock off can be dropped onto any empty square later. Trade only when you get something back, and a Dolphin or Whale on the bench is worth more than one on the board.</li>
+    <li><b>Watch for the Try.</b> If their Leader can reach your back column on a square you can't hit next turn, stop it now, even at the cost of a piece.</li>
+    <li><b>Turtles are cheap until they turn gold.</b> A Gold Turtle moves almost like a Leader. Drop a Turtle one column from their back column to threaten promotion.</li>
+    <li><b>Opening:</b> the solved line starts with your Turtle taking theirs. The coach finds it from the starting position.</li>
+    <li><b>Normal mode gives you 3 undos</b>, so on a stage you can try the coach's line, and back up if it surprises you.</li>
+   </ul>
+  </div>
+ </div>
+</div>
+</div>
+<script>
+// Puka Puka Fight engine (same rules as Dōbutsu shōgi). Board 3 cols x 4 rows, index r*3+c.
+// Row 0 = opponent's back row (top), row 3 = your back row (bottom). Side 0 = you (moves up), side 1 = opponent.
+// Cell: 0 empty, type 1..5 for you, type|8 for opponent. Types: 1 Leader, 2 Dolphin, 3 Whale, 4 Turtle, 5 Gold turtle.
+const T={L:1,D:2,W:3,T:4,G:5};
+const DIRS={1:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],2:[[-1,0],[1,0],[0,-1],[0,1]],3:[[-1,-1],[-1,1],[1,-1],[1,1]],4:[[-1,0]],5:[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]]};
+const VAL={2:5,3:5,4:2,5:6}; const HANDVAL={2:6,3:6,4:2.5};
+function own(p){return p? (p&8?1:0):-1}
+function typ(p){return p&7}
+function clone(s){return {b:s.b.slice(),h:[s.h[0].slice(),s.h[1].slice()],turn:s.turn}}
+function key(s){return s.b.join(',')+'|'+s.h[0].join('')+s.h[1].join('')+s.turn}
+function lionPos(s,side){for(let i=0;i<12;i++){const p=s.b[i];if(p&&typ(p)===1&&own(p)===side)return i}return -1}
+// moves: {from,to,drop:type|0}
+function moves(s){const side=s.turn,out=[];const fwd=side===0?1:-1;
+ for(let i=0;i<12;i++){const p=s.b[i];if(!p||own(p)!==side)continue;const t=typ(p),r=(i/3)|0,c=i%3;
+  for(const [dr,dc] of DIRS[t]){const nr=r+dr*fwd,nc=c+dc;if(nr<0||nr>3||nc<0||nc>2)continue;const j=nr*3+nc,q=s.b[j];if(q&&own(q)===side)continue;out.push({from:i,to:j,drop:0})}}
+ for(const t of [2,3,4]){if(!s.h[side][t])continue;for(let j=0;j<12;j++)if(!s.b[j])out.push({from:-1,to:j,drop:t})}
+ return out}
+// apply returns new state and captured type (1 = leader captured)
+function apply(s,m){const n=clone(s),side=s.turn;let cap=0;
+ if(m.drop){n.b[m.to]=m.drop|(side?8:0);n.h[side][m.drop]--}
+ else{const p=n.b[m.from],q=n.b[m.to];if(q){cap=typ(q);if(cap!==1){const back=cap===5?4:cap;n.h[side][back]++}}
+  let np=p;const r=(m.to/3)|0;if(typ(p)===4&&((side===0&&r===0)||(side===1&&r===3)))np=5|(side?8:0);
+  n.b[m.from]=0;n.b[m.to]=np}
+ n.turn=1-side;n.cap=cap;return n}
+// result for side to move: 1 win, -1 loss, 0 none
+function terminal(s){const me=s.turn;
+ if(lionPos(s,me)<0)return -1;if(lionPos(s,1-me)<0)return 1;
+ const lp=lionPos(s,me),r=(lp/3)|0; if((me===0&&r===0)||(me===1&&r===3))return 1; // my Leader survived a turn on the far row (Try)
+ return 0}
+function evaluate(s){const me=s.turn;let v=0;
+ for(let i=0;i<12;i++){const p=s.b[i];if(!p)continue;const t=typ(p),sg=own(p)===me?1:-1;
+  if(t!==1)v+=sg*VAL[t];else{const r=(i/3)|0;const adv=own(p)===0?3-r:r;v+=sg*adv*0.6}}
+ for(const t of [2,3,4]){v+=(s.h[me][t]-s.h[1-me][t])*HANDVAL[t]}
+ // threats to Leaders
+ return v}
+const MATE=10000;
+function search(s,maxMs){const t0=Date.now();const tt=new Map();let nodes=0,stop=false;
+ function order(s,ms){return ms.map(m=>{const q=s.b[m.to];let sc=0;if(q)sc=typ(q)===1?1000:10*(VAL[typ(q)]||0);if(m.drop)sc-=1;return [sc,m]}).sort((a,b)=>b[0]-a[0]).map(x=>x[1])}
+ function neg(s,d,a,b,ply,path){nodes++;if((nodes&2047)===0&&Date.now()-t0>maxMs){stop=true}
+  const term=terminal(s);if(term)return term*(MATE-ply);
+  const k=key(s);if(path.has(k))return 0;
+  if(d<=0)return evaluate(s);
+  const e=tt.get(k);let best=-Infinity,bm=null;let first=e&&e.m;
+  if(e&&e.d>=d){if(e.f===0)return e.v;if(e.f===1&&e.v>=b)return e.v;if(e.f===-1&&e.v<=a)return e.v}
+  let ms=order(s,moves(s));if(first){const i=ms.findIndex(m=>m.from===first.from&&m.to===first.to&&m.drop===first.drop);if(i>0){ms.unshift(ms.splice(i,1)[0])}}
+  if(!ms.length)return -(MATE-ply);
+  const a0=a;path.add(k);
+  for(const m of ms){const v=-neg(apply(s,m),d-1,-b,-a,ply+1,path);if(stop)break;if(v>best){best=v;bm=m}if(v>a)a=v;if(a>=b)break}
+  path.delete(k);
+  if(!stop)tt.set(k,{d,v:best,f:best<=a0?-1:best>=b?1:0,m:bm});
+  return best}
+ let result=null,depth=0;
+ for(let d=1;d<=40;d++){const path=new Set();let a=-Infinity,best=-Infinity,bm=null;
+  let ms=moves(s);const e=tt.get(key(s));ms=order(s,ms);if(e&&e.m){const i=ms.findIndex(m=>m.from===e.m.from&&m.to===e.m.to&&m.drop===e.m.drop);if(i>0)ms.unshift(ms.splice(i,1)[0])}
+  const ranked=[];
+  path.add(key(s));
+  for(const m of ms){const v=-neg(apply(s,m),d-1,-Infinity,-a,1,path);if(stop)break;ranked.push([v,m]);if(v>best){best=v;bm=m}if(v>a)a=v}
+  if(stop)break;tt.set(key(s),{d,v:best,f:0,m:bm});result={move:bm,score:best,depth:d};depth=d;
+  if(Math.abs(best)>MATE-100)break;
+  if(Date.now()-t0>maxMs*0.45)break}
+ if(result)result.nodes=nodes;return result}
+function start(){const b=new Array(12).fill(0);
+ b[0]=2|8;b[1]=1|8;b[2]=3|8;b[4]=4|8; // opponent back row: Dolphin, Leader, Whale; Turtle in front
+ b[7]=4;b[9]=3;b[10]=1;b[11]=2; // you: Whale left, Leader, Dolphin right; Turtle in front
+ return {b,h:[[0,0,0,0,0],[0,0,0,0,0]],turn:0}}
+const NAMES={1:'Leader',2:'Dolphin',3:'Whale',4:'Turtle',5:'Gold Turtle'};
+const SHORT={1:'Leader',2:'Dolphin',3:'Whale',4:'Turtle',5:'Gold'};
+let state=start(), history=[], mode='play', sel=null, hint=null, last=null, pick={t:1,side:0};
+function save(){try{localStorage.setItem('puka',JSON.stringify({state,history}))}catch(e){}}
+try{const d=JSON.parse(localStorage.getItem('puka')||'null');if(d&&d.state&&d.state.b&&d.state.b.length===12){state=d.state;history=d.history||[]}}catch(e){}
+function pieceEl(t,side,tag,noLabel){const el=document.createElement(tag||'div');el.className='pc '+(side?'opp':'you');
+ if(!noLabel){const nm=document.createElement('span');nm.className='nm';nm.textContent=SHORT[t];el.appendChild(nm)}
+ const s=side?-1:1; // their pieces face left, so their dots are mirrored instead of the whole piece being turned upside down
+ for(const [dr,dc] of DIRS[t]){const d=document.createElement('span');d.className='dot';d.style.top=(50+s*dc*41-6)+'%';d.style.left=(50-s*dr*41-6)+'%';el.appendChild(d)}
+ el.title=NAMES[t]+(side?' (theirs)':' (yours)');return el}
+function moveText(m,side){const sq=i=>'column '+(4-((i/3)|0))+' '+['top','middle','bottom'][i%3];
+ if(m.drop)return 'Drop '+NAMES[m.drop]+' on '+sq(m.to);
+ const p=state.b[m.from];const q=state.b[m.to];
+ return NAMES[typ(p)]+' '+sq(m.from)+' → '+sq(m.to)+(q?' (knocks off '+NAMES[typ(q)]+')':'')}
+function legalFrom(from,drop){return moves(state).filter(m=>drop?m.drop===drop:m.from===from&&!m.drop)}
+function render(){
+ const B=document.getElementById('board');B.innerHTML='';
+ const tg=sel?(sel.drop?legalFrom(-1,sel.drop):legalFrom(sel.from)).map(m=>m.to):[];
+ for(let k=0;k<12;k++){const y=(k/4)|0,x=k%4,i=(3-x)*3+y;const c=document.createElement('button');c.className='cell';c.dataset.i=i;c.setAttribute('aria-label','Column '+(x+1)+' '+['top','middle','bottom'][y]);
+  if(sel&&!sel.drop&&sel.from===i)c.classList.add('sel');
+  if(mode==='play'&&tg.includes(i))c.classList.add('tgt');
+  if(hint&&hint.from===i)c.classList.add('hfrom');if(hint&&hint.to===i)c.classList.add('hto');
+  if(last&&(last.to===i))c.classList.add('last');
+  const p=state.b[i];if(p){c.appendChild(pieceEl(typ(p),own(p)));if(mode==='setup'||(own(p)===state.turn&&!terminal(state)))c.dataset.drag=JSON.stringify({from:i})}
+  c.onclick=()=>clickCell(i);B.appendChild(c)}
+ for(const side of [0,1]){const H=document.querySelector('#hand'+side+' .slots');H.innerHTML='';
+  for(const t of [2,3,4]){const n=state.h[side][t];if(!n)continue;const el=pieceEl(t,side,'button');
+   const ct=document.createElement('span');ct.className='ct';ct.textContent='×'+n;el.appendChild(ct);
+   if(sel&&sel.drop===t&&state.turn===side)el.classList.add('sel');if(hint&&hint.drop===t&&state.turn===side)el.classList.add('hfrom');
+   if(mode==='play'&&state.turn===side&&!terminal(state))el.dataset.drag=JSON.stringify({drop:t});
+   el.onclick=()=>{if(mode!=='play'||state.turn!==side)return;sel={drop:t};hint=null;render()};H.appendChild(el)}
+  if(!H.children.length){const e=document.createElement('span');e.className='status';e.textContent='Empty';H.appendChild(e)}}
+ const T=document.getElementById('turn');T.innerHTML='';const sw=document.createElement('span');sw.className='sw';sw.style.background=state.turn?'var(--opp)':'var(--you)';T.append(sw,document.createTextNode(state.turn?'Their move':'Your move'));
+ const term=terminal(state);
+ document.getElementById('help').textContent= mode==='setup'?'Setup mode: tap or drag from the palette to place pieces; drag a piece off the board to remove it.':
+  term? (term===1?(state.turn?'They have won this position.':'You have won this position.'):(state.turn?'You have won this position.':'They have won this position.')) :
+  'Drag a piece to a highlighted square, or tap it and then the square. Enter their move the same way when it is their turn.';
+ document.getElementById('mPlay').classList.toggle('on',mode==='play');document.getElementById('mSetup').classList.toggle('on',mode==='setup');
+ document.getElementById('setupCard').hidden=mode!=='setup';
+ document.getElementById('undo').disabled=!history.length;
+ renderSetup()}
+function play(m){history.push(JSON.stringify(state));state=apply(state,m);delete state.cap;last=m;sel=null;hint=null;document.getElementById('playit').disabled=true;save();render()}
+function clickCell(i){
+ if(mode==='setup'){if(pick.t===0)state.b[i]=0;else state.b[i]=pick.t|(pick.side?8:0);hint=null;save();render();return}
+ if(terminal(state))return;
+ const p=state.b[i];
+ if(sel){const ms=sel.drop?legalFrom(-1,sel.drop):legalFrom(sel.from);const m=ms.find(m=>m.to===i);if(m){play(m);return}}
+ if(p&&own(p)===state.turn){sel={from:i};hint=null}else sel=null;render()}
+function renderSetup(){if(mode!=='setup')return;
+ for(const side of [0,1]){const P=document.getElementById(side?'palOpp':'palYou');P.innerHTML='';
+  for(const t of [1,2,3,4,5]){const el=pieceEl(t,side,'button');if(pick.t===t&&pick.side===side)el.classList.add('picked');el.dataset.drag=JSON.stringify({place:t,side});el.onclick=()=>{pick={t,side};render()};P.appendChild(el)}
+  if(side===0){const e=document.createElement('button');e.className='erase'+(pick.t===0?' picked':'');e.textContent='✕';e.title='Empty square';e.onclick=()=>{pick={t:0,side:0};render()};P.appendChild(e)}}
+ const BE=document.getElementById('benchEdit');BE.innerHTML='';
+ for(const side of [0,1])for(const t of [2,3,4]){const w=document.createElement('span');w.className='row';w.style.gap='4px';
+  const lab=document.createElement('span');lab.className='status';lab.textContent=(side?'Their ':'Your ')+NAMES[t]+': '+state.h[side][t];
+  const mi=document.createElement('button');mi.className='b';mi.textContent='−';mi.onclick=()=>{state.h[side][t]=Math.max(0,state.h[side][t]-1);save();render()};
+  const pl=document.createElement('button');pl.className='b';pl.textContent='+';pl.onclick=()=>{state.h[side][t]=Math.min(2,state.h[side][t]+1);save();render()};
+  w.append(lab,mi,pl);BE.appendChild(w)}}
+function legend(){const L=document.getElementById('legend');for(const t of [1,2,3,4,5]){const d=document.createElement('div');d.append(pieceEl(t,0,'div',true),document.createTextNode(NAMES[t]+' · '+{1:'any direction',2:'straight lines',3:'diagonals',4:'forward only',5:'all but back-diagonals'}[t]));L.appendChild(d)}}
+document.getElementById('best').onclick=()=>{
+ const term=terminal(state);const V=document.getElementById('verdict'),A=document.getElementById('advice'),M=document.getElementById('meta');
+ if(term){V.textContent='Game over';A.textContent='';return}
+ V.className='verdict';V.textContent='Thinking…';A.textContent='';M.textContent='';
+ setTimeout(()=>{const r=search(state,1500);if(!r||!r.move){V.textContent='No legal move';return}
+  hint=r.move;const who=state.turn?'them':'you';
+  const sc=r.score;let verdict;
+  if(sc>MATE-100){const n=Math.ceil((MATE-sc)/2);V.className='verdict '+(state.turn?'lose':'win');verdict=(state.turn?'They win':'You win')+' in '+n+' move'+(n>1?'s':'')}
+  else if(sc<-(MATE-100)){const n=Math.ceil((MATE+sc)/2);V.className='verdict '+(state.turn?'win':'lose');verdict=(state.turn?'You win':'They win')+' in '+n+' with best play'}
+  else{const s=state.turn?-sc:sc;verdict=s>1.5?'You are ahead':s<-1.5?'You are behind':'About even'}
+  V.textContent=verdict;A.textContent='Best move for '+who+': '+moveText(r.move,state.turn);
+  M.textContent='Looked '+r.depth+' moves ahead · '+r.nodes.toLocaleString()+' positions';
+  document.getElementById('playit').disabled=false;render()},30)};
+document.getElementById('playit').onclick=()=>{if(hint)play(hint)};
+document.getElementById('undo').onclick=()=>{if(!history.length)return;state=JSON.parse(history.pop());hint=null;sel=null;last=null;save();render()};
+document.getElementById('flip').onclick=()=>{state.turn=1-state.turn;hint=null;sel=null;save();render()};
+document.getElementById('reset').onclick=()=>{history=[];state=start();hint=null;sel=null;last=null;save();render()};
+document.getElementById('clear').onclick=()=>{history.push(JSON.stringify(state));state={b:new Array(12).fill(0),h:[[0,0,0,0,0],[0,0,0,0,0]],turn:state.turn};save();render()};
+document.getElementById('mPlay').onclick=()=>{mode='play';render()};
+document.getElementById('mSetup').onclick=()=>{mode='setup';sel=null;hint=null;render()};
+
+// Drag and drop (mouse and touch). A short press without movement still counts as a tap.
+let drag=null,noClick=false;
+const cellEl=i=>document.querySelector('.cell[data-i="'+i+'"]');
+function cellAt(x,y){const e=document.elementFromPoint(x,y);const c=e&&e.closest&&e.closest('.cell');return c?+c.dataset.i:-1}
+document.addEventListener('pointerdown',e=>{if(e.button>0)return;const src=e.target.closest&&e.target.closest('[data-drag]');if(!src)return;
+ drag={src,info:JSON.parse(src.dataset.drag),x0:e.clientX,y0:e.clientY,id:e.pointerId,ghost:null,over:-1}});
+document.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;
+ if(!drag.ghost){if(Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)<8)return;
+  const pc=drag.src.classList.contains('pc')?drag.src:drag.src.querySelector('.pc');if(!pc){drag=null;return}
+  const r=pc.getBoundingClientRect(),g=pc.cloneNode(true);g.classList.add('ghost');g.classList.remove('sel','hfrom','picked');g.style.width=r.width+'px';g.style.fontSize=getComputedStyle(pc).fontSize;
+  g.querySelectorAll('.nm').forEach(n=>n.style.fontSize=getComputedStyle(pc.querySelector('.nm')||pc).fontSize);
+  document.body.appendChild(g);drag.ghost=g;drag.pc=pc;pc.classList.add('lifted');
+  document.querySelectorAll('.cell.tgt,.cell.sel').forEach(c=>c.classList.remove('tgt','sel'));
+  const inf=drag.info;if(mode==='play'){drag.targets=(inf.drop?legalFrom(-1,inf.drop):legalFrom(inf.from)).map(m=>m.to);drag.targets.forEach(i=>cellEl(i).classList.add('tgt'))}}
+ e.preventDefault();drag.ghost.style.left=e.clientX+'px';drag.ghost.style.top=e.clientY+'px';
+ const o=cellAt(e.clientX,e.clientY);if(o!==drag.over){if(drag.over>=0)cellEl(drag.over)?.classList.remove('over');if(o>=0)cellEl(o).classList.add('over');drag.over=o}},{passive:false});
+function endDrag(e,cancel){if(!drag||e.pointerId!==drag.id)return;const d=drag;drag=null;if(!d.ghost)return;
+ d.ghost.remove();noClick=true;setTimeout(()=>noClick=false,0);
+ const to=cancel?-1:cellAt(e.clientX,e.clientY),inf=d.info;
+ if(mode==='play'){const m=to<0?null:(inf.drop?legalFrom(-1,inf.drop):legalFrom(inf.from)).find(m=>m.to===to);if(m){play(m);return}sel=null;render();return}
+ if(cancel){render();return}
+ if(inf.place){if(to>=0)state.b[to]=inf.place|(inf.side?8:0);pick={t:inf.place,side:inf.side}}
+ else if(inf.from!==undefined&&to!==inf.from){const p=state.b[inf.from];state.b[inf.from]=0;if(to>=0)state.b[to]=p}
+ hint=null;save();render()}
+document.addEventListener('pointerup',e=>endDrag(e,false));
+document.addEventListener('pointercancel',e=>endDrag(e,true));
+document.addEventListener('click',e=>{if(noClick){e.stopPropagation();e.preventDefault()}},true);
+legend();render();
+</script>
