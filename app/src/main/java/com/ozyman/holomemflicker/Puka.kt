@@ -238,9 +238,10 @@ object Puka {
                 if (v > best) { best = v; bm = m }
                 if (v > a) a = v
             }
-            if (stop || bm == null) break
-            tt[s.key()] = Entry(d, best, 0, bm)
-            result = Result(bm, best, d, nodes)
+            val chosen = bm
+            if (stop || chosen == null) break
+            tt[s.key()] = Entry(d, best, 0, chosen)
+            result = Result(chosen, best, d, nodes)
             if (Math.abs(best) > MATE - 100) break
             if (clock() - t0 > maxMs * 0.45) break
         }
