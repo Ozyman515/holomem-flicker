@@ -99,7 +99,7 @@ class QuickMenuTest {
     @Test
     fun rowsListModesThenExtras() {
         val rows = QuickMenu.rows(listOf("Live", "Park"), 1, false, "Neon")
-        assertEquals(listOf("Live", "Park", "Overlay", "Look", "Edit layout", "Close"), rows.map { it.label })
+        assertEquals(listOf("Live", "Park", "Overlay", "Look", "Edit layout", "Puka Coach", "Close"), rows.map { it.label })
         assertTrue(rows[1].current)
         assertEquals("off", rows[2].hint)
         assertTrue(rows[2].gapBefore)
