@@ -118,6 +118,10 @@ class FlickService : IFlickService.Stub() {
         engine?.setOverlay(on)
     }
 
+    override fun setCoach(on: Boolean) {
+        engine?.setCoach(on)
+    }
+
     override fun setEditing(on: Boolean) {
         engine?.setEditing(on)
     }

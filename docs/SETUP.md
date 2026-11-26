@@ -125,8 +125,8 @@ The flicker has three **modes**, each with its own layout. Pick one on the main 
 |---|---|
 | **Select + L1** | Show / hide the layout overlay (with live dots and trails of every touch) |
 | **Select + R1** | Next mode (a banner shows the mode name) |
-| **Select + Start** | Open the in-game layout editor |
-| **Select + Y** | Quick menu: pick a mode, turn the overlay on/off, change the look, or open the editor. **D-pad** up/down moves, **A** chooses, **B** (or Select + Y) closes. Nothing reaches the game while it's open. |
+| **Select + Start** | Open / close the **Puka Puka Coach** panel (see below) |
+| **Select + Y** | Quick menu: pick a mode, turn the overlay on/off, change the look, open the layout editor or the Puka Coach. **D-pad** up/down moves, **A** chooses, **B** (or Select + Y) closes. Nothing reaches the game while it's open. |
 
 Buttons pressed while Select is held never tap. **Select on its own** still taps if it's mapped (on release).
 
@@ -155,12 +155,24 @@ One button can have **several points** (one press, several fingers).
 - **Stick type** – with a stick selected, cycles **flick → joystick → camera → off**.
 - **Reset** – back to the default layout. **Save** / **Cancel**.
 
-**In the game** – press **Select + Start**. The editor opens over the game (the game can't be touched while it's open):
+**In the game** – press **Select + Y** and choose **Edit layout**. The editor opens over the game (the game can't be touched while it's open):
 tap empty space to add a point and press its button, tap a point to select it (touch it again and hold to drag it), use the same d-pad and buttons (Swipe, Speed and End too), then **Save** or **Exit**.
 Pressing **Select + Start** again also closes it and keeps your changes.
 
 **Style** – on the main screen, pick how the circles and buttons are drawn (the preview updates as you tap):
 **Penlight** (default), **Minimal**, **Neon**, **Bubble**, **Gamepad** or **Pixel**. It applies to the in-game overlay and both editors; colours always follow your theme.
+
+### Puka Puka Coach in the game
+
+Press **Select + Start** during Puka Puka Fight. A panel shows a mini copy of the board (your side on the left, like the game) and walks you through the match with the controller. While it's open the controller only talks to the panel; tap your moves into the game by hand.
+
+- **Pieces:** Leader yellow, Dolphin pink, Whale blue, Turtle green (Gold Turtle has a gold ring). **Yours are squares, theirs are circles.**
+- **Your turn:** it thinks for about a second and a half, then marks the best move in **red** (outlined in the colour of the piece that moves) and asks **Play best move?** – **A** = yes.
+- **Their turn:** it lists their most likely replies. **D-pad** up/down walks the list and each one is shown in **violet** on the board so you can match it to what they did; **A** confirms.
+- **B / Other…:** a different move entered by hand (D-pad cursor over the board and benches, **A** picks the piece, then the square), **Undo the last move**, **Match ended in a draw**, **New match**, **Panel settings** (size, see-through, move the panel).
+- Pieces that get knocked off go to the bench of whoever took them, both ways.
+- **Match over:** **Undo the last move** puts the board back to just before the final move (in case of a wrong entry).
+- **Fix board** (the one touch button, under the panel): **hold** it for a second to open a touch editor and correct the position; **Done** puts it back into the coach.
 
 ## 9. Tuning
 

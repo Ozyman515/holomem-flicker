@@ -3,7 +3,7 @@ package com.ozyman.holomemflicker
 /**
  * The in-game quick menu (Select+Y): switch mode, overlay, look or open the editor
  * without touching the screen. The engine owns the highlight and runs the choices;
- * the overlay only draws it. Rows: one per mode, then Overlay, Look, Edit layout, Close.
+ * the overlay only draws it. Rows: one per mode, then Overlay, Look, Edit layout, Puka Coach, Close.
  * D-pad up/down moves (wraps), A chooses, B or Select+Y closes.
  */
 object QuickMenu {
@@ -13,13 +13,14 @@ object QuickMenu {
     const val KEY_DPAD_UP = 0x220
     const val KEY_DPAD_DOWN = 0x221
 
-    const val EXTRAS = 4 // Overlay, Look, Edit, Close
+    const val EXTRAS = 5 // Overlay, Look, Edit, Coach, Close
 
     sealed class Item {
         data class SetMode(val index: Int) : Item()
         object Overlay : Item()
         object Look : Item()
         object Edit : Item()
+        object Coach : Item()
         object Close : Item()
     }
 
@@ -30,6 +31,7 @@ object QuickMenu {
         i == modes -> Item.Overlay
         i == modes + 1 -> Item.Look
         i == modes + 2 -> Item.Edit
+        i == modes + 3 -> Item.Coach
         else -> Item.Close
     }
 
@@ -44,6 +46,7 @@ object QuickMenu {
         out.add(Row("Overlay", if (overlayOn) "on" else "off", false, true))
         out.add(Row("Look", lookName, false, false))
         out.add(Row("Edit layout", "", false, false))
+        out.add(Row("Puka Coach", "Select+Start", false, false))
         out.add(Row("Close", "", false, false))
         return out
     }

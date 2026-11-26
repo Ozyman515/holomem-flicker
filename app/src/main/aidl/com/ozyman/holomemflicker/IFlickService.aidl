@@ -21,4 +21,5 @@ interface IFlickService {
     String installVerified(String url, String sha256) = 16;
     // Long poll: returns the state once it changes past sinceSeq (or after timeoutMs).
     String waitState(long sinceSeq, int traceSince, int timeoutMs) = 17;
+    void setCoach(boolean on) = 18;
 }

@@ -248,7 +248,7 @@ class MainActivity : Activity() {
         }
 
         section("Modes")
-        label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode, Select + Start to edit.", 14f)
+        label("In game: hold Select and press L1 to show/hide the layout, Select + R1 to switch mode, Select + Start for the Puka Puka Coach, Select + Y for the quick menu (and the layout editor).", 14f)
             .setTextColor(Raden.INK_SOFT)
         modeText = label("")
         modeBtns.clear()

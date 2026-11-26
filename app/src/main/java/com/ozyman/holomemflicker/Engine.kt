@@ -24,6 +24,8 @@ import kotlin.math.min
  *      off
  *  - combos: hold the MODIFIER (Select). Select+L1 = overlay on/off, Select+R1 = next mode,
  *    Select+Y = quick menu (D-pad up/down picks, A chooses, B or Select+Y closes; see [QuickMenu]).
+ *    Select+Start = Puka Puka Coach panel (closes the layout editor instead while that is open);
+ *    while the coach is open every button and the d-pad go to it, nothing reaches the game.
  *    Buttons pressed while Select is held never tap. Select alone taps (on release) if mapped.
  */
 class Engine(cfg: JSONObject) : Thread("flicker-engine") {
@@ -113,6 +115,12 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     // quick menu: while open nothing reaches the game; the overlay draws it from [stateJson]
     @Volatile var menuOpen = false
+    /** Puka Puka Coach open (Select+Start): buttons are reported as [coachKey], never tapped. */
+    @Volatile var coach = false
+    @Volatile var coachKey = ""
+    private var coachSeq = 0
+    private var hatX = 0
+    private var hatY = 0
         private set
     @Volatile var menuIdx = 0
         private set
@@ -294,6 +302,8 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
         o.put("editing", editing)
         o.put("menu", menuOpen)
         o.put("menuIdx", menuIdx)
+        o.put("coach", coach)
+        o.put("coachKey", coachKey)
         o.put("lookSeq", lookSeq)
         o.put("modeNames", JSONArray(modes.map { it.name }))
         o.put("lastKey", lastKey)
@@ -336,9 +346,42 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
     /** In-game editor open: nothing reaches the game. */
     @Synchronized
     fun setEditing(on: Boolean) {
-        if (on) { releaseMode(); menuOpen = false }
+        if (on) { releaseMode(); menuOpen = false; coach = false }
         editing = on
         bump()
+    }
+
+    // ---- Puka Puka Coach ----
+
+    @Synchronized
+    fun setCoach(on: Boolean) {
+        if (on == coach) return
+        if (on) {
+            if (editing) return
+            releaseMode()
+            menuOpen = false
+        }
+        coach = on
+        note("coach ${if (on) "open" else "closed"}")
+        bump()
+    }
+
+    private fun coachPress(code: Int) {
+        coachSeq++
+        coachKey = "$coachSeq:$code"
+    }
+
+    /** D-pad as a hat axis while the coach is open: each new direction is one press. */
+    private fun coachHat(code: Int, value: Int): Boolean {
+        if (!coach) return false
+        if (code == HAT_X) {
+            if (value != 0 && value != hatX) coachPress(if (value < 0) Coach.KEY_LEFT else Coach.KEY_RIGHT)
+            hatX = value
+        } else if (code == HAT_Y) {
+            if (value != 0 && value != hatY) coachPress(if (value < 0) Coach.KEY_UP else Coach.KEY_DOWN)
+            hatY = value
+        }
+        return code == HAT_X || code == HAT_Y
     }
 
     // ---- quick menu ----
@@ -367,6 +410,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             QuickMenu.Item.Overlay -> { overlayOn = !overlayOn; note("overlay ${if (overlayOn) "on" else "off"}") }
             QuickMenu.Item.Look -> lookSeq++
             QuickMenu.Item.Edit -> { setMenu(false); setEditing(true); note("editor open") }
+            QuickMenu.Item.Coach -> { setMenu(false); setCoach(true) }
             QuickMenu.Item.Close -> setMenu(false)
         }
         bump()
@@ -381,7 +425,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
 
     /** For tests: a d-pad hat movement. */
     fun feedHatForTest(code: Int, value: Int) {
-        synchronized(this) { menuHat(code, value) }
+        synchronized(this) { if (!coachHat(code, value)) menuHat(code, value) }
         bump()
     }
 
@@ -484,9 +528,9 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             3 -> { // EV_ABS
                 r.raw[code] = value
                 active = r
-                if (menuHat(code, value)) bump()
+                if (coachHat(code, value) || menuHat(code, value)) bump()
             }
-            0 -> if (code == 0 && active === r && !editing && !menuOpen) { // SYN_REPORT
+            0 -> if (code == 0 && active === r && !editing && !menuOpen && !coach) { // SYN_REPORT
                 for (s in mode.sticks) stick(injector, r, s)
                 if (ticker == null && mode.sticks.any { it.type == "camera" && hypot(r.norm(it.ax), r.norm(it.ay)) >= it.dead }) startTicker()
             }
@@ -584,7 +628,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                 comboUsed = false
             } else {
                 modHeld = false
-                if (!comboUsed && !editing && injector != null) quickTap(injector, code) // Select alone = its own tap
+                if (!comboUsed && !editing && !coach && injector != null) quickTap(injector, code) // Select alone = its own tap
             }
             return
         }
@@ -598,14 +642,23 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
                 }
                 modeKey -> setMode((modeIdx + 1) % modes.size)
                 editKey -> {
-                    setEditing(!editing)
-                    note("editor ${if (editing) "open" else "closed"}")
+                    if (editing) { setEditing(false); note("editor closed") }
+                    else setCoach(!coach)
                 }
                 menuKey -> setMenu(!menuOpen)
             }
             return
         }
         if (value == 0 && suppressed.remove(code)) return
+
+        // ---- coach: every button goes to the panel, nothing reaches the game ----
+        if (coach) {
+            if (value == 1) {
+                suppressed.add(code)
+                coachPress(code)
+            }
+            return
+        }
 
         // ---- quick menu: buttons drive the menu, nothing reaches the game ----
         if (menuOpen) {
@@ -746,7 +799,7 @@ class Engine(cfg: JSONObject) : Thread("flicker-engine") {
             synchronized(this) {
                 val injector = inj ?: return stopTicker()
                 val a = active ?: return stopTicker()
-                if (modes.isEmpty() || editing || !running) { stopTicker(); return }
+                if (modes.isEmpty() || editing || coach || !running) { stopTicker(); return }
                 for (s in mode.sticks) {
                     if (s.type != "camera") continue
                     val x = a.norm(s.ax)

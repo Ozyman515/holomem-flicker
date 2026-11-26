@@ -32,6 +32,8 @@ import rikka.shizuku.Shizuku
  *  - the current mode's layout when the overlay is toggled on (Select+L1)
  *  - a short banner with the mode name whenever the mode changes (Select+R1)
  *  - the quick menu (Select+Y, see [QuickMenu]) while the engine has it open
+ *  - the Puka Puka Coach panel (Select+Start, see [Coach]); its only touch control, the
+ *    hold-to-open "Fix board" button, is a separate small window next to the panel
  * The window never takes touches, and stays under Android's 0.8 opacity limit so
  * touches (real or injected) still reach the game underneath.
  */
@@ -55,6 +57,15 @@ class OverlayService : Service() {
     private var menuOpenedAt = 0L
     private var modeNames: List<String> = emptyList()
     private var lastLookSeq = -1
+
+    // Puka Puka Coach (controller-driven panel; see [Coach])
+    private var coachOpen = false
+    private var coachKeySeen: String? = null
+    private var coach: Coach? = null
+    private val coachWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val coachPainter by lazy { CoachPainter(resources.displayMetrics.density) }
+    private var fixButton: CoachFixButton? = null
+    private var fixView: CoachFixView? = null
 
     // Injected touches, drawn as dots + trails while the overlay is on (like the controller test screen)
     private val touches = TouchTrails()
@@ -145,6 +156,17 @@ class OverlayService : Service() {
                 lastKeySeen = lk
             }
             editor?.onPoll(pressedNow)
+            val co = o.optBoolean("coach")
+            if (co && !coachOpen) coach().resume()
+            if (!co && coachOpen) closeFix()
+            coachOpen = co
+            val ck = o.optString("coachKey")
+            if (coachKeySeen == null) coachKeySeen = ck
+            else if (ck != coachKeySeen) {
+                coachKeySeen = ck
+                val code = ck.substringAfter(':').toIntOrNull()
+                if (co && code != null && fixView == null) coach().onKey(code)
+            }
             val menu = o.optBoolean("menu")
             if (menu && !menuOpen) menuOpenedAt = SystemClock.uptimeMillis()
             menuOpen = menu
@@ -184,6 +206,9 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         alive = false
+        coachWorker.shutdownNow()
+        closeFix()
+        removeFixButton()
         poller.interrupt()
         handler.removeCallbacksAndMessages(null)
         removeView()
@@ -229,10 +254,90 @@ class OverlayService : Service() {
 
     private fun refresh() {
         val showBanner = SystemClock.uptimeMillis() < bannerUntil
-        val want = (overlayOn || showBanner || menuOpen) && editor == null && !sleeping
+        val want = (overlayOn || showBanner || menuOpen || coachOpen) && editor == null && !sleeping
         if (want && view == null) addView()
         if (!want && view != null) removeView()
         view?.invalidate()
+        val wantFix = coachOpen && view != null && fixView == null
+        if (!wantFix) removeFixButton()
+    }
+
+    // ---- Puka Puka Coach ----
+
+    private fun json(s: String): JSONObject? = try { if (s.isEmpty()) null else JSONObject(s) } catch (_: Throwable) { null }
+
+    private fun coach(): Coach = coach ?: Coach(
+        runAsync = { job -> coachWorker.execute(job) },
+        post = { r -> handler.post(r) },
+        changed = { refresh() },
+        settings = Coach.Settings.from(json(Prefs.getStr(this, "coach.settings", ""))),
+    ).also { c ->
+        c.onSave = { Prefs.putStr(this, "coach.state", c.toJson().toString()) }
+        c.onSettings = {
+            Prefs.putStr(this, "coach.settings", c.settings.toJson().toString())
+            refresh()
+        }
+        coach = c
+        c.load(json(Prefs.getStr(this, "coach.state", "")))
+    }
+
+    /** Puts the Fix board button just under the panel (called after each draw of the panel). */
+    private fun placeFixButton(px: Float, py: Float) {
+        if (!coachOpen || fixView != null || view == null) { removeFixButton(); return }
+        val sc = coach().settings.scale / 100f
+        var b = fixButton
+        if (b == null || b.scale != sc) {
+            removeFixButton()
+            b = CoachFixButton(this) { handler.post { openFix() } }.also { it.scale = sc }
+            val lp = WindowManager.LayoutParams(
+                b.sizeW(), b.sizeH(),
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            lp.gravity = Gravity.TOP or Gravity.START
+            lp.x = px.toInt(); lp.y = py.toInt()
+            lp.alpha = 0.9f
+            try { wm?.addView(b, lp); fixButton = b } catch (_: Throwable) { return }
+        }
+        val lp = b.layoutParams as? WindowManager.LayoutParams ?: return
+        if (lp.x != px.toInt() || lp.y != py.toInt()) {
+            lp.x = px.toInt(); lp.y = py.toInt()
+            try { wm?.updateViewLayout(b, lp) } catch (_: Throwable) {}
+        }
+    }
+
+    private fun removeFixButton() {
+        val b = fixButton ?: return
+        try { wm?.removeView(b) } catch (_: Throwable) {}
+        fixButton = null
+    }
+
+    private fun openFix() {
+        if (fixView != null || !coachOpen || !Settings.canDrawOverlays(this)) return
+        removeFixButton()
+        val v = CoachFixView(this, coach().state) { result ->
+            handler.post {
+                closeFix()
+                if (result != null) coach().setPosition(result)
+                refresh()
+            }
+        }
+        val lp = WindowManager.LayoutParams(
+            v.sizeW(), v.sizeH(),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        lp.gravity = Gravity.CENTER
+        try { wm?.addView(v, lp); fixView = v } catch (_: Throwable) {}
+        refresh()
+    }
+
+    private fun closeFix() {
+        val v = fixView ?: return
+        try { wm?.removeView(v) } catch (_: Throwable) {}
+        fixView = null
     }
 
     private fun addView() {
@@ -537,7 +642,26 @@ class OverlayService : Service() {
                 c.drawText(label.uppercase(), w / 2, r.centerY() + bannerTxt.textSize * 0.35f, bannerTxt)
             }
             if (menuOpen) drawMenu(c, w, h)
+            if (coachOpen && fixView == null) drawCoach(c, w, h)
             if (showBanner) postInvalidateDelayed(100)
+        }
+
+        // ---- coach panel ----
+        private val coachLoc = IntArray(2)
+
+        private fun drawCoach(c: Canvas, w: Float, h: Float) {
+            val co = coach()
+            coachPainter.draw(c, w, h, co, SystemClock.uptimeMillis())
+            if (co.thinking) postInvalidateDelayed(150)
+            getLocationOnScreen(coachLoc)
+            val p = coachPainter.panel
+            val gap = 8 * resources.displayMetrics.density
+            val px = p.left + coachLoc[0]
+            // under the panel, or above it when the panel sits at the bottom of the screen
+            val btnH = 44 * resources.displayMetrics.density * co.settings.scale / 100f
+            var py = p.bottom + coachLoc[1] + gap
+            if (py + btnH > resources.displayMetrics.heightPixels) py = p.top + coachLoc[1] - gap - btnH
+            handler.post { placeFixButton(px, py) }
         }
 
         // ---- quick menu ----
