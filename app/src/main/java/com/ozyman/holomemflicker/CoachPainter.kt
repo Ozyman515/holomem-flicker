@@ -56,7 +56,8 @@ class CoachPainter(private val density: Float) {
         val pw = boardW + pad * 2
         val items = coach.items
         val listH = items.size * 34 * u
-        val ph = pad + 22 * u + cell * 3 + 14 * u + 26 * u + 20 * u + listH + pad
+        val tall = coach.state.w // 3 rows on the normal board, 4 on some stages
+        val ph = pad + 22 * u + cell * tall + 14 * u + 26 * u + 20 * u + listH + pad
         val x0 = ((w - pw) * st.x).coerceAtLeast(0f)
         val y0 = ((h - ph) * st.y).coerceAtLeast(0f)
         panel.set(x0, y0, x0 + pw, y0 + ph)
@@ -84,7 +85,7 @@ class CoachPainter(private val density: Float) {
         drawBoard(c, coach, bx, by, cell)
         drawBench(c, coach, 0, x0 + pad, by, bench, cell)
         drawBench(c, coach, 1, bx + cell * 4 + 6 * u, by, bench, cell)
-        y += cell * 3 + 14 * u
+        y += cell * tall + 14 * u
 
         // prompt + detail
         text.textAlign = Paint.Align.LEFT
@@ -131,19 +132,22 @@ class CoachPainter(private val density: Float) {
         return "$t…"
     }
 
+    private var cur: Puka.State = Puka.start()
+
     private fun cellRect(bx: Float, by: Float, cell: Float, i: Int): RectF {
-        val x = bx + Puka.screenX(i) * cell
-        val y = by + Puka.screenY(i) * cell
+        val x = bx + cur.sx(i) * cell
+        val y = by + cur.sy(i) * cell
         return RectF(x, y, x + cell, y + cell)
     }
 
     private fun drawBoard(c: Canvas, coach: Coach, bx: Float, by: Float, cell: Float) {
         val s = coach.state
+        cur = s
         // squares: your back column tinted warm, theirs cool (like the game's two halves)
-        for (i in 0 until 12) {
+        for (i in 0 until s.n) {
             val r = cellRect(bx, by, cell, i)
             r.inset(1.5f * u, 1.5f * u)
-            fill.color = when (Puka.screenX(i)) { 0 -> Color.rgb(0x3A, 0x2F, 0x2A); 3 -> Color.rgb(0x26, 0x30, 0x44); else -> Color.rgb(0x26, 0x2C, 0x3B) }
+            fill.color = when (s.sx(i)) { 0 -> Color.rgb(0x3A, 0x2F, 0x2A); s.rows - 1 -> Color.rgb(0x26, 0x30, 0x44); else -> Color.rgb(0x26, 0x2C, 0x3B) }
             c.drawRoundRect(r, 8 * u, 8 * u, fill)
         }
         coach.last?.let { m ->
@@ -169,7 +173,7 @@ class CoachPainter(private val density: Float) {
                 c.drawCircle(r.centerX(), r.centerY(), 7 * u, fill)
             }
         }
-        for (i in 0 until 12) {
+        for (i in 0 until s.n) {
             val p = s.b[i]
             if (p == 0) continue
             val r = cellRect(bx, by, cell, i)
@@ -178,7 +182,7 @@ class CoachPainter(private val density: Float) {
         }
         if (hl != null && hl.first.from >= 0) arrow(c, cellRect(bx, by, cell, hl.first.from), cellRect(bx, by, cell, hl.first.to), if (hl.second == Coach.Role.BEST) BEST else THEIRS)
         if (coach.phase == Coach.Phase.MANUAL && coach.cx in 0..3) {
-            val r = cellRect(bx, by, cell, Puka.index(coach.cx, coach.cy)); r.inset(1 * u, 1 * u)
+            val r = cellRect(bx, by, cell, s.idx(coach.cx, coach.cy)); r.inset(1 * u, 1 * u)
             stroke.color = Color.WHITE; stroke.strokeWidth = 3.5f * u
             c.drawRoundRect(r, 9 * u, 9 * u, stroke)
         }
@@ -217,7 +221,8 @@ class CoachPainter(private val density: Float) {
 
     private fun drawBench(c: Canvas, coach: Coach, side: Int, x: Float, by: Float, w: Float, cell: Float) {
         val s = coach.state
-        val r = RectF(x, by, x + w, by + cell * 3)
+        val tall = s.w
+        val r = RectF(x, by, x + w, by + cell * tall)
         fill.color = Raden.alpha(INK, 0x10)
         c.drawRoundRect(r, 10 * u, 10 * u, fill)
         val hl = coach.highlight
@@ -249,11 +254,11 @@ class CoachPainter(private val density: Float) {
             }
         }
         text.textSize = 9 * u; text.isFakeBoldText = true; text.textAlign = Paint.Align.CENTER; text.color = MUTED
-        c.drawText(if (side == 0) "YOU" else "THEM", x + w / 2, by + cell * 3 + 11 * u, text)
+        c.drawText(if (side == 0) "YOU" else "THEM", x + w / 2, by + cell * tall + 11 * u, text)
         if (side == 0) {
             // column numbers under the board (1 = your side), as used in the move list
             val bx = x + w + 6 * u
-            for (k in 0..3) c.drawText("${k + 1}", bx + cell * k + cell / 2, by + cell * 3 + 11 * u, text)
+            for (k in 0 until s.rows) c.drawText("${k + 1}", bx + cell * k + cell / 2, by + cell * tall + 11 * u, text)
         }
     }
 

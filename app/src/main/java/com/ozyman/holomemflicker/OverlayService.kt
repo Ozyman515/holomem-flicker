@@ -273,6 +273,7 @@ class OverlayService : Service() {
         settings = Coach.Settings.from(json(Prefs.getStr(this, "coach.settings", ""))),
     ).also { c ->
         c.onSave = { Prefs.putStr(this, "coach.state", c.toJson().toString()) }
+        c.onFix = { handler.post { openFix(fresh = true) } }
         c.onSettings = {
             Prefs.putStr(this, "coach.settings", c.settings.toJson().toString())
             refresh()
@@ -313,13 +314,15 @@ class OverlayService : Service() {
         fixButton = null
     }
 
-    private fun openFix() {
+    /** [fresh] = setting up a stage's own starting board for a new match (any size). */
+    private fun openFix(fresh: Boolean = false) {
         if (fixView != null || !coachOpen || !Settings.canDrawOverlays(this)) return
         removeFixButton()
-        val v = CoachFixView(this, coach().state) { result ->
+        val start = if (fresh) Puka.empty(0, coach().state.w) else coach().state
+        val v = CoachFixView(this, start, if (fresh) "Stage setup" else "Fix board") { result ->
             handler.post {
                 closeFix()
-                if (result != null) coach().setPosition(result)
+                if (result != null) { if (fresh) coach().startFrom(result) else coach().setPosition(result) }
                 refresh()
             }
         }

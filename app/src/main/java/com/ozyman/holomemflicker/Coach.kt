@@ -66,6 +66,8 @@ class Coach(
     val last: Puka.Move? get() = played.lastOrNull()?.takeIf { it.to >= 0 }
 
     var onSettings: (() -> Unit)? = null
+    /** Opens the touch board editor (the overlay's Fix board window). */
+    var onFix: (() -> Unit)? = null
     var onSave: (() -> Unit)? = null
 
     // ---------------------------------------------------------------- what the panel shows
@@ -101,8 +103,9 @@ class Coach(
     val items: List<Item>
         get() = when (phase) {
             Phase.START -> listOf(
-                Item("I go first") { newMatch(0) },
-                Item("They go first") { newMatch(1) },
+                Item("Normal start: I go first") { newMatch(0) },
+                Item("Normal start: they go first") { newMatch(1) },
+                Item("Stage's own setup", "set up in Fix board") { onFix?.invoke() },
                 Item("Panel settings") { goTo(Phase.SETTINGS) },
             )
             Phase.MY_TURN -> buildList {
@@ -211,8 +214,8 @@ class Coach(
         when (code) {
             KEY_LEFT -> cx = (cx - 1).coerceAtLeast(-1)
             KEY_RIGHT -> cx = (cx + 1).coerceAtMost(4)
-            KEY_UP -> cy = (cy - 1 + 3) % 3
-            KEY_DOWN -> cy = (cy + 1) % 3
+            KEY_UP -> cy = (cy - 1 + state.w) % state.w
+            KEY_DOWN -> cy = (cy + 1) % state.w
             KEY_B -> if (picked != null) picked = null else goTo(Phase.OTHER)
             KEY_A -> manualPick()
         }
@@ -228,18 +231,18 @@ class Coach(
             if (cx == -1 || cx == 4) {
                 val benchSide = if (cx == -1) 0 else 1
                 val t = benchType(cy)
-                if (benchSide == side && state.hand(side, t) > 0) picked = Puka.Move(-1, -1, t)
+                if (cy <= 2 && benchSide == side && state.hand(side, t) > 0) picked = Puka.Move(-1, -1, t)
                 else note = "Nothing to drop there"
                 return
             }
-            val i = Puka.index(cx, cy)
+            val i = state.idx(cx, cy)
             val q = state.b[i]
             if (q != 0 && Puka.own(q) == side && Puka.moves(state).any { it.from == i && it.drop == 0 }) picked = Puka.Move(i, -1, 0)
             else note = if (side == 0) "Pick one of your pieces" else "Pick one of their pieces"
             return
         }
         if (cx == -1 || cx == 4) return
-        val to = Puka.index(cx, cy)
+        val to = state.idx(cx, cy)
         val m = Puka.moves(state).firstOrNull { it.from == p.from && it.drop == p.drop && it.to == to }
         if (m != null) { picked = null; play(m) } else note = "It can't go there"
     }
@@ -269,6 +272,14 @@ class Coach(
         goTo(turnPhase())
     }
 
+    /** A new match from a stage's own starting board (any size), set up in Fix board. */
+    fun startFrom(s: Puka.State) {
+        history.clear(); played.clear()
+        state = s.copy()
+        drawn = false
+        goTo(if (Puka.terminal(state) != 0) Phase.OVER else turnPhase())
+    }
+
     /** The board was fixed by hand ("Fix board"): keep the old one so Undo can bring it back. */
     fun setPosition(s: Puka.State) {
         if (s == state) { goTo(turnPhase()); return }
@@ -290,7 +301,7 @@ class Coach(
         picked = null
         // start the cursor on the side to move's Leader
         val lp = Puka.leaderPos(state, state.turn)
-        if (lp >= 0) { cx = Puka.screenX(lp); cy = Puka.screenY(lp) }
+        if (lp >= 0) { cx = state.sx(lp); cy = state.sy(lp) }
         goTo(Phase.MANUAL)
     }
 
@@ -336,7 +347,7 @@ class Coach(
     // ---------------------------------------------------------------- saving
 
     fun toJson(): JSONObject {
-        fun st(s: Puka.State) = JSONObject().put("b", JSONArray(s.b.toList())).put("h", JSONArray(s.h.toList())).put("t", s.turn)
+        fun st(s: Puka.State) = JSONObject().put("b", JSONArray(s.b.toList())).put("h", JSONArray(s.h.toList())).put("t", s.turn).put("w", s.w)
         return JSONObject()
             .put("state", st(state))
             .put("history", JSONArray(history.map { st(it) }))
@@ -350,7 +361,7 @@ class Coach(
         try {
             fun st(j: JSONObject): Puka.State {
                 val b = j.getJSONArray("b"); val h = j.getJSONArray("h")
-                return Puka.State(IntArray(12) { b.getInt(it) }, IntArray(10) { h.getInt(it) }, j.getInt("t"))
+                return Puka.State(IntArray(b.length()) { b.getInt(it) }, IntArray(10) { h.getInt(it) }, j.getInt("t"), j.optInt("w", 3))
             }
             val s = st(o.getJSONObject("state"))
             val hs = o.getJSONArray("history").let { a -> (0 until a.length()).map { st(a.getJSONObject(it)) } }

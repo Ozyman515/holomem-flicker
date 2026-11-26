@@ -125,6 +125,26 @@ class CoachScreensTest {
     }
 
     @Test
+    fun fourTall() {
+        val s = Puka.empty(0, 4)
+        s.b[s.idx(0, 1)] = Puka.LEADER; s.b[s.idx(0, 2)] = Puka.WHALE; s.b[s.idx(1, 1)] = Puka.TURTLE; s.b[s.idx(1, 3)] = Puka.DOLPHIN
+        s.b[s.idx(3, 2)] = Puka.LEADER or 8; s.b[s.idx(3, 0)] = Puka.DOLPHIN or 8; s.b[s.idx(2, 2)] = Puka.TURTLE or 8; s.b[s.idx(3, 3)] = Puka.WHALE or 8
+        s.h[0 * 5 + Puka.TURTLE] = 1
+        val c = coach(); c.startFrom(s)
+        shot("coach-10-four-tall", c)
+        val ctx = RuntimeEnvironment.getApplication()
+        val v = CoachFixView(ctx, s, "Stage setup") {}
+        v.measure(View.MeasureSpec.makeMeasureSpec(v.sizeW(), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(v.sizeH(), View.MeasureSpec.EXACTLY))
+        v.layout(0, 0, v.sizeW(), v.sizeH())
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val cv = Canvas(bmp)
+        backdrop(cv)
+        cv.translate((w - v.sizeW()) / 2f, (h - v.sizeH()) / 2f)
+        v.draw(cv)
+        File(out, "coach-11-stage-setup-four-tall.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test
     fun fixBoard() {
         val ctx = RuntimeEnvironment.getApplication()
         Raden.apply(ctx)

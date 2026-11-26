@@ -71,10 +71,10 @@ class CoachFixButton(ctx: Context, private val onFire: () -> Unit) : View(ctx) {
  * eraser) and tap squares, + / − for the benches, choose whose move it is, then Done.
  * Laid out like the game: your side on the left.
  */
-class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.State?) -> Unit) : View(ctx) {
+class CoachFixView(ctx: Context, start: Puka.State, private val title: String = "Fix board", private val onDone: (Puka.State?) -> Unit) : View(ctx) {
     private val d = ctx.resources.displayMetrics.density
     private val painter = CoachPainter(d)
-    val s = start.copy()
+    var s = start.copy()
     private var pick = Puka.LEADER // type; 0 = eraser
     private var pickSide = 0
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -84,7 +84,7 @@ class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.St
 
     private val cell get() = 64 * d
     fun sizeW() = (cell * 4 + 2 * 120 * d + 48 * d).toInt()
-    fun sizeH() = (40 * d + cell * 3 + 24 * d + 56 * d + 16 * d + 52 * d + 24 * d).toInt()
+    fun sizeH() = (40 * d + cell * 4 + 24 * d + 56 * d + 16 * d + 52 * d + 24 * d).toInt() // room for the 4-tall board
 
     override fun onDraw(c: Canvas) {
         hits.clear()
@@ -92,17 +92,17 @@ class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.St
         fill.color = CoachPainter.PANEL
         c.drawRoundRect(0f, 0f, w, height.toFloat(), 20 * d, 20 * d, fill)
         text.textSize = 16 * d; text.color = CoachPainter.INK
-        c.drawText("Fix board: pick a piece, tap squares", w / 2, 28 * d, text)
+        c.drawText("$title: pick a piece, tap squares", w / 2, 28 * d, text)
 
         val bench = 120 * d
         val bx = 24 * d + bench
         val by = 40 * d
         // board
-        for (i in 0 until 12) {
-            val x = bx + Puka.screenX(i) * cell
-            val y = by + Puka.screenY(i) * cell
+        for (i in 0 until s.n) {
+            val x = bx + s.sx(i) * cell
+            val y = by + s.sy(i) * cell
             val r = RectF(x, y, x + cell, y + cell); r.inset(2 * d, 2 * d)
-            fill.color = if (Puka.screenX(i) == 0) Color.rgb(0x3A, 0x2F, 0x2A) else Color.rgb(0x26, 0x2C, 0x3B)
+            fill.color = if (s.sx(i) == 0) Color.rgb(0x3A, 0x2F, 0x2A) else Color.rgb(0x26, 0x2C, 0x3B)
             c.drawRoundRect(r, 10 * d, 10 * d, fill)
             val p = s.b[i]
             if (p != 0) painter.piece(c, r.centerX(), r.centerY(), cell * 0.34f, Puka.typ(p), Puka.own(p))
@@ -124,7 +124,7 @@ class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.St
             }
         }
         // palette: your 5 types, their 5 types, eraser
-        var y = by + cell * 3 + 24 * d
+        var y = by + cell * s.w + 24 * d
         val pw = ((w - 48 * d - 8 * d * 10) / 11).coerceAtMost(48 * d)
         val total = pw * 11 + 8 * d * 10
         var x = (w - total) / 2
@@ -141,12 +141,16 @@ class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.St
         c.drawText("✕", er.centerX(), er.centerY() + 8 * d, text)
         hits.add(er to { pick = 0; invalidate() })
         y += pw + 16 * d
-        // whose move + Cancel / Done
-        val bw = (w - 48 * d - 24 * d) / 3
-        button(c, RectF(24 * d, y, 24 * d + bw, y + 44 * d), if (s.turn == 0) "Your move" else "Their move") { s.turn = 1 - s.turn }
-        button(c, RectF(36 * d + bw, y, 36 * d + bw * 2, y + 44 * d), "Cancel") { onDone(null) }
+        // board size, whose move, Cancel / Done
+        val bw = (w - 48 * d - 36 * d) / 4
+        button(c, RectF(24 * d, y, 24 * d + bw, y + 44 * d), "${s.w} tall ⇄") {
+            // switching size starts an empty board of the other size (benches kept)
+            s = Puka.State(IntArray((7 - s.w) * 4), s.h.copyOf(), s.turn, 7 - s.w)
+        }
+        button(c, RectF(36 * d + bw, y, 36 * d + bw * 2, y + 44 * d), if (s.turn == 0) "Your move" else "Their move") { s.turn = 1 - s.turn }
+        button(c, RectF(48 * d + bw * 2, y, 48 * d + bw * 3, y + 44 * d), "Cancel") { onDone(null) }
         val ok = Puka.leaderPos(s, 0) >= 0 && Puka.leaderPos(s, 1) >= 0
-        button(c, RectF(48 * d + bw * 2, y, 48 * d + bw * 3, y + 44 * d), if (ok) "Done" else "Needs both Leaders", primary = ok) { if (ok) onDone(s.copy()) }
+        button(c, RectF(60 * d + bw * 3, y, 60 * d + bw * 4, y + 44 * d), if (ok) "Done" else "Add Leaders", primary = ok) { if (ok) onDone(s.copy()) }
     }
 
     private fun button(c: Canvas, r: RectF, label: String, primary: Boolean = false, run: () -> Unit) {

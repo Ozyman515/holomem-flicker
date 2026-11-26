@@ -5,7 +5,9 @@ package com.ozyman.holomemflicker
  * A straight port of the engine in assets/puka-coach.html, so the overlay coach and the
  * Coach screen pick the same moves (PukaTest checks this against the page's engine).
  *
- * Board: 3 columns x 4 rows, index r*3+c. Row 0 = their back row, row 3 = your back row.
+ * Board: w columns (3, or 4 on some Challenge stages) x 4 rows, index r*w+c. Row 0 = their back
+ * row, the last row = your back row. On screen the rows run left to right (your back row on the
+ * left) and the columns top to bottom.
  * Side 0 = you (moves toward row 0), side 1 = them.
  * Cell: 0 empty, type 1..5 for you, type|8 for them.
  * Types: 1 Leader, 2 Dolphin, 3 Whale, 4 Turtle, 5 Gold Turtle.
@@ -35,17 +37,31 @@ object Puka {
     fun own(p: Int): Int = if (p == 0) -1 else if (p and 8 != 0) 1 else 0
     fun typ(p: Int): Int = p and 7
 
-    class State(val b: IntArray, val h: IntArray, var turn: Int) {
-        fun copy() = State(b.copyOf(), h.copyOf(), turn)
+    class State(val b: IntArray, val h: IntArray, var turn: Int, val w: Int = 3) {
+        val n get() = b.size
+        val rows get() = b.size / w
+        fun copy() = State(b.copyOf(), h.copyOf(), turn, w)
         fun hand(side: Int, t: Int) = h[side * 5 + t]
-        /** Unique number for the position (board, benches, side to move). */
+        /** Screen column (0 = your back row, on the left) and screen row (0 = top) of a board index. */
+        fun sx(i: Int) = rows - 1 - i / w
+        fun sy(i: Int) = i % w
+        fun idx(x: Int, y: Int) = (rows - 1 - x) * w + y
+        /** Number for the position (board, benches, side to move): exact on the 3-wide board, a 64-bit hash on 4-wide. */
         fun key(): Long {
-            var k = 0L
-            for (p in b) k = k * 16 + p
-            for (side in 0..1) for (t in 2..4) k = k * 3 + h[side * 5 + t].coerceIn(0, 2)
-            return k * 2 + turn
+            if (w == 3 && b.size == 12) {
+                var k = 0L
+                for (p in b) k = k * 16 + p
+                for (side in 0..1) for (t in 2..4) k = k * 3 + h[side * 5 + t].coerceIn(0, 2)
+                return k * 2 + turn
+            }
+            var k = -0x340d631b7bdddcdbL
+            fun mix(v: Int) { k = (k xor v.toLong()) * 0x100000001b3L; k = k xor (k ushr 29) }
+            for (p in b) mix(p)
+            for (side in 0..1) for (t in 2..4) mix(h[side * 5 + t] + 16)
+            mix(turn + 32); mix(w + 64)
+            return k
         }
-        override fun equals(other: Any?) = other is State && b.contentEquals(other.b) && h.contentEquals(other.h) && turn == other.turn
+        override fun equals(other: Any?) = other is State && w == other.w && b.contentEquals(other.b) && h.contentEquals(other.h) && turn == other.turn
         override fun hashCode() = key().hashCode()
     }
 
@@ -59,23 +75,25 @@ object Puka {
         return State(b, IntArray(10), 0)
     }
 
-    fun empty(turn: Int = 0) = State(IntArray(12), IntArray(10), turn)
+    fun empty(turn: Int = 0, w: Int = 3) = State(IntArray(w * 4), IntArray(10), turn, w)
 
     fun moves(s: State): List<Move> {
         val side = s.turn
         val out = ArrayList<Move>()
         val fwd = if (side == 0) 1 else -1
-        for (i in 0 until 12) {
+        val w = s.w
+        val last = s.rows - 1
+        for (i in 0 until s.n) {
             val p = s.b[i]
             if (p == 0 || own(p) != side) continue
             val t = typ(p)
-            val r = i / 3
-            val c = i % 3
+            val r = i / w
+            val c = i % w
             for (d in DIRS.getValue(t)) {
                 val nr = r + d[0] * fwd
                 val nc = c + d[1]
-                if (nr < 0 || nr > 3 || nc < 0 || nc > 2) continue
-                val j = nr * 3 + nc
+                if (nr < 0 || nr > last || nc < 0 || nc >= w) continue
+                val j = nr * w + nc
                 val q = s.b[j]
                 if (q != 0 && own(q) == side) continue
                 out.add(Move(i, j, 0))
@@ -83,7 +101,7 @@ object Puka {
         }
         for (t in 2..4) {
             if (s.h[side * 5 + t] == 0) continue
-            for (j in 0 until 12) if (s.b[j] == 0) out.add(Move(-1, j, t))
+            for (j in 0 until s.n) if (s.b[j] == 0) out.add(Move(-1, j, t))
         }
         return out
     }
@@ -103,8 +121,8 @@ object Puka {
                 if (cap != LEADER) n.h[side * 5 + (if (cap == GOLD) TURTLE else cap)]++
             }
             var np = p
-            val r = m.to / 3
-            if (typ(p) == TURTLE && ((side == 0 && r == 0) || (side == 1 && r == 3))) np = GOLD or (if (side == 1) 8 else 0)
+            val r = m.to / s.w
+            if (typ(p) == TURTLE && ((side == 0 && r == 0) || (side == 1 && r == s.rows - 1))) np = GOLD or (if (side == 1) 8 else 0)
             n.b[m.from] = 0
             n.b[m.to] = np
         }
@@ -115,7 +133,7 @@ object Puka {
     fun captured(s: State, m: Move): Int = if (m.drop != 0) 0 else typ(s.b[m.to])
 
     fun leaderPos(s: State, side: Int): Int {
-        for (i in 0 until 12) {
+        for (i in 0 until s.n) {
             val p = s.b[i]
             if (p != 0 && typ(p) == LEADER && own(p) == side) return i
         }
@@ -127,8 +145,8 @@ object Puka {
         val me = s.turn
         if (leaderPos(s, me) < 0) return -1
         if (leaderPos(s, 1 - me) < 0) return 1
-        val r = leaderPos(s, me) / 3
-        if ((me == 0 && r == 0) || (me == 1 && r == 3)) return 1 // my Leader survived a turn on their back row (a Try)
+        val r = leaderPos(s, me) / s.w
+        if ((me == 0 && r == 0) || (me == 1 && r == s.rows - 1)) return 1 // my Leader survived a turn on their back row (a Try)
         return 0
     }
 
@@ -142,15 +160,15 @@ object Puka {
     fun evaluate(s: State): Double {
         val me = s.turn
         var v = 0.0
-        for (i in 0 until 12) {
+        for (i in 0 until s.n) {
             val p = s.b[i]
             if (p == 0) continue
             val t = typ(p)
             val sg = if (own(p) == me) 1 else -1
             if (t != LEADER) v += sg * VAL[t]
             else {
-                val r = i / 3
-                val adv = if (own(p) == 0) 3 - r else r
+                val r = i / s.w
+                val adv = if (own(p) == 0) s.rows - 1 - r else r
                 v += sg * adv * 0.6
             }
         }
@@ -313,26 +331,30 @@ object Puka {
 
     /** "Dolphin c2 → c3" style text; squares are named like the game screen (column 1 = your side). */
     fun moveText(s: State, m: Move): String {
-        if (m.drop != 0) return "Drop ${NAMES[m.drop]} on ${square(m.to)}"
+        if (m.drop != 0) return "Drop ${NAMES[m.drop]} on ${square(s, m.to)}"
         val p = s.b[m.from]
         val q = s.b[m.to]
-        return "${NAMES[typ(p)]} ${square(m.from)} → ${square(m.to)}" + (if (q != 0) " (takes ${NAMES[typ(q)]})" else "")
+        return "${NAMES[typ(p)]} ${square(s, m.from)} → ${square(s, m.to)}" + (if (q != 0) " (takes ${NAMES[typ(q)]})" else "")
     }
 
-    /** Screen column (0 = your back row, on the left) and row (0 = top) of a board index. */
+    /** Screen column (0 = your back row, on the left) and row (0 = top) on the standard 3-wide board. */
     fun screenX(i: Int) = 3 - i / 3
     fun screenY(i: Int) = i % 3
     fun index(x: Int, y: Int) = (3 - x) * 3 + y
 
-    fun square(i: Int) = "column ${screenX(i) + 1} " + arrayOf("top", "middle", "bottom")[screenY(i)]
+    private fun rowWords(w: Int) = if (w == 4) arrayOf("top", "upper middle", "lower middle", "bottom") else arrayOf("top", "middle", "bottom")
+    private fun rowLetters(w: Int) = if (w == 4) "TULB" else "TMB"
 
-    /** Short square name for the overlay: column 1..4 from your side + T/M/B (top, middle, bottom), e.g. "3M". */
-    fun short(i: Int) = "${screenX(i) + 1}" + "TMB"[screenY(i)]
+    fun square(s: State, i: Int) = "column ${s.sx(i) + 1} " + rowWords(s.w)[s.sy(i)]
+
+    /** Short square name for the overlay: column 1..4 from your side + a row letter, e.g. "3M"
+     *  (rows T/M/B on the 3-tall board; T/U/L/B = top, upper, lower, bottom on the 4-tall one). */
+    fun short(s: State, i: Int) = "${s.sx(i) + 1}" + rowLetters(s.w)[s.sy(i)]
 
     /** Short move text for the overlay list, e.g. "Leader 4B → 3M · takes Gold Turtle". */
     fun shortText(s: State, m: Move): String {
-        if (m.drop != 0) return "Drop ${NAMES[m.drop]} → ${short(m.to)}"
+        if (m.drop != 0) return "Drop ${NAMES[m.drop]} → ${short(s, m.to)}"
         val q = s.b[m.to]
-        return "${NAMES[typ(s.b[m.from])]} ${short(m.from)} → ${short(m.to)}" + (if (q != 0) " · takes ${NAMES[typ(q)]}" else "")
+        return "${NAMES[typ(s.b[m.from])]} ${short(s, m.from)} → ${short(s, m.to)}" + (if (q != 0) " · takes ${NAMES[typ(q)]}" else "")
     }
 }

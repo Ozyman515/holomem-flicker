@@ -127,7 +127,7 @@ class CoachTest {
     fun settingsSizeAndSeeThrough() {
         var saved = 0
         val c = coach().also { it.onSettings = { saved++ } }
-        c.onKey(Coach.KEY_DOWN); c.onKey(Coach.KEY_DOWN) // START: Panel settings
+        repeat(3) { c.onKey(Coach.KEY_DOWN) } // START: Panel settings
         c.onKey(A)
         assertEquals(Coach.Phase.SETTINGS, c.phase)
         c.onKey(Coach.KEY_RIGHT) // size +10
@@ -219,5 +219,49 @@ class CoachTest {
         assertTrue(e.st().getBoolean("coach"))
         assertFalse(e.st().getBoolean("menu"))
         e.shutdown()
+    }
+
+    // ---- 4-tall boards (some Challenge stages) ----
+
+    private fun four(turn: Int): Puka.State {
+        val s = Puka.empty(turn, 4)
+        s.b[s.idx(0, 1)] = Puka.LEADER
+        s.b[s.idx(3, 2)] = Puka.LEADER or 8
+        s.b[s.idx(1, 3)] = Puka.TURTLE
+        s.b[s.idx(2, 0)] = Puka.WHALE or 8
+        return s
+    }
+
+    @Test
+    fun fourTallBoardRulesAndCoach() {
+        val s = four(0)
+        assertEquals(16, s.n); assertEquals(4, s.rows)
+        // Leader in the middle of column 1 (screen row 1 of 4): 5 steps on the board edge column
+        val lp = s.idx(0, 1)
+        assertEquals(5, Puka.moves(s).count { it.from == lp })
+        // the Turtle on the bottom screen row (row 4) steps forward along that row
+        val tp = s.idx(1, 3)
+        assertEquals(listOf(s.idx(2, 3)), Puka.moves(s).filter { it.from == tp }.map { it.to })
+        // a Turtle reaching their back column turns gold
+        val t2 = Puka.empty(0, 4).also { it.b[it.idx(0, 0)] = Puka.LEADER; it.b[it.idx(3, 3)] = Puka.LEADER or 8; it.b[it.idx(2, 1)] = Puka.TURTLE }
+        val g = Puka.apply(t2, Puka.Move(t2.idx(2, 1), t2.idx(3, 1), 0))
+        assertEquals(Puka.GOLD, g.b[g.idx(3, 1)])
+        // a Try on the 4-tall board
+        val tr = Puka.empty(0, 4).also { it.b[it.idx(2, 0)] = Puka.LEADER; it.b[it.idx(1, 3)] = Puka.LEADER or 8 }
+        val after = Puka.apply(tr, Puka.Move(tr.idx(2, 0), tr.idx(3, 0), 0))
+        assertEquals(0, Puka.terminal(after)) // their turn: they can't reach it
+        assertNotNull(Puka.search(s, 300))
+        // the coach plays it and the hand-entry cursor wraps over 4 rows
+        val c = coach()
+        c.startFrom(s)
+        assertEquals(Coach.Phase.MY_TURN, c.phase)
+        assertNotNull(c.best)
+        c.onKey(B); c.onKey(A)
+        assertEquals(Coach.Phase.MANUAL, c.phase)
+        repeat(3) { c.onKey(Coach.KEY_DOWN) }
+        assertEquals(0, c.cy) // 1 → 2 → 3 → 0
+        val d = coach(); d.load(JSONObject(c.toJson().toString()))
+        assertEquals(4, d.state.w)
+        assertEquals(c.state, d.state)
     }
 }
