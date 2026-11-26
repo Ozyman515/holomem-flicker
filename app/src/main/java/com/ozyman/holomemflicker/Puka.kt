@@ -325,4 +325,14 @@ object Puka {
     fun index(x: Int, y: Int) = (3 - x) * 3 + y
 
     fun square(i: Int) = "column ${screenX(i) + 1} " + arrayOf("top", "middle", "bottom")[screenY(i)]
+
+    /** Short square name for the overlay: column 1..4 from your side + T/M/B (top, middle, bottom), e.g. "3M". */
+    fun short(i: Int) = "${screenX(i) + 1}" + "TMB"[screenY(i)]
+
+    /** Short move text for the overlay list, e.g. "Leader 4B → 3M · takes Gold Turtle". */
+    fun shortText(s: State, m: Move): String {
+        if (m.drop != 0) return "Drop ${NAMES[m.drop]} → ${short(m.to)}"
+        val q = s.b[m.to]
+        return "${NAMES[typ(s.b[m.from])]} ${short(m.from)} → ${short(m.to)}" + (if (q != 0) " · takes ${NAMES[typ(q)]}" else "")
+    }
 }

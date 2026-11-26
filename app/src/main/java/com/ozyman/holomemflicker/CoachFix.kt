@@ -125,7 +125,7 @@ class CoachFixView(ctx: Context, start: Puka.State, private val onDone: (Puka.St
         }
         // palette: your 5 types, their 5 types, eraser
         var y = by + cell * 3 + 24 * d
-        val pw = 48 * d
+        val pw = ((w - 48 * d - 8 * d * 10) / 11).coerceAtMost(48 * d)
         val total = pw * 11 + 8 * d * 10
         var x = (w - total) / 2
         for (side in 0..1) for (t in 1..5) {

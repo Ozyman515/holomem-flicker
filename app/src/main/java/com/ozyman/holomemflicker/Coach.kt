@@ -89,7 +89,7 @@ class Coach(
     val detail: String
         get() = when (phase) {
             Phase.MY_TURN -> best?.let { b ->
-                verdict(b.score, 0) + " · " + Puka.moveText(state, b.move)
+                verdict(b.score, 0) + " · " + Puka.shortText(state, b.move)
             } ?: ""
             Phase.THEIR_TURN -> if (thinking || replies.isEmpty()) "" else "Most likely first · A picks · Other… for anything else"
             Phase.MANUAL -> "A selects · B goes back"
@@ -110,7 +110,7 @@ class Coach(
                 add(Item("Other…") { openOther() })
             }
             Phase.THEIR_TURN -> buildList {
-                for (m in replies) add(Item(Puka.moveText(state, m)) { play(m) })
+                for (m in replies) add(Item(Puka.shortText(state, m)) { play(m) })
                 add(Item("Other…") { openOther() })
             }
             Phase.OTHER -> buildList {

@@ -173,7 +173,8 @@ class CoachPainter(private val density: Float) {
             val p = s.b[i]
             if (p == 0) continue
             val r = cellRect(bx, by, cell, i)
-            piece(c, r.centerX(), r.centerY(), cell * 0.36f, Puka.typ(p), Puka.own(p))
+            val lit = (hl != null && (hl.first.from == i || hl.first.to == i)) || (coach.phase == Coach.Phase.MANUAL && coach.picked?.from == i)
+            piece(c, r.centerX(), r.centerY(), cell * (if (lit) 0.29f else 0.36f), Puka.typ(p), Puka.own(p))
         }
         if (hl != null && hl.first.from >= 0) arrow(c, cellRect(bx, by, cell, hl.first.from), cellRect(bx, by, cell, hl.first.to), if (hl.second == Coach.Role.BEST) BEST else THEIRS)
         if (coach.phase == Coach.Phase.MANUAL && coach.cx in 0..3) {
@@ -183,13 +184,14 @@ class CoachPainter(private val density: Float) {
         }
     }
 
-    /** Red (or violet) square with a thick outline in the moving piece's colour. */
+    /** Red (or violet) square with a thick outline in the moving piece's colour; the piece sits inside the red. */
     private fun mark(c: Canvas, cellR: RectF, col: Int, t: Int, target: Boolean) {
-        val r = RectF(cellR); r.inset(2.5f * u, 2.5f * u)
-        fill.color = col; fill.alpha = if (target) 0xD0 else 0x80
-        c.drawRoundRect(r, 8 * u, 8 * u, fill)
-        stroke.color = if (t == Puka.GOLD) GOLD_RING else colorOf(t); stroke.strokeWidth = 4 * u
-        c.drawRoundRect(r, 8 * u, 8 * u, stroke)
+        val r = RectF(cellR); r.inset(1.5f * u, 1.5f * u)
+        stroke.color = colorOf(t); stroke.strokeWidth = 4 * u
+        val inner = RectF(r); inner.inset(2 * u, 2 * u)
+        fill.color = col; fill.alpha = if (target) 0xFF else 0xC8
+        c.drawRoundRect(inner, 7 * u, 7 * u, fill)
+        c.drawRoundRect(inner, 7 * u, 7 * u, stroke)
     }
 
     private fun arrow(c: Canvas, a: RectF, b: RectF, col: Int) {
@@ -227,7 +229,8 @@ class CoachPainter(private val density: Float) {
             if (coach.phase == Coach.Phase.MANUAL && coach.picked?.drop == t && s.turn == side) mark(c, slot, BEST, t, false)
             val n = s.hand(side, t)
             if (n > 0) {
-                piece(c, x + w / 2, cy, w * 0.34f, t, side)
+                val lit = (hl != null && hl.first.drop == t && s.turn == side) || (coach.phase == Coach.Phase.MANUAL && coach.picked?.drop == t && s.turn == side)
+                piece(c, x + w / 2, cy, w * (if (lit) 0.27f else 0.34f), t, side)
                 if (n > 1) {
                     text.textSize = 11 * u; text.isFakeBoldText = true; text.textAlign = Paint.Align.CENTER
                     fill.color = INK
@@ -247,6 +250,11 @@ class CoachPainter(private val density: Float) {
         }
         text.textSize = 9 * u; text.isFakeBoldText = true; text.textAlign = Paint.Align.CENTER; text.color = MUTED
         c.drawText(if (side == 0) "YOU" else "THEM", x + w / 2, by + cell * 3 + 11 * u, text)
+        if (side == 0) {
+            // column numbers under the board (1 = your side), as used in the move list
+            val bx = x + w + 6 * u
+            for (k in 0..3) c.drawText("${k + 1}", bx + cell * k + cell / 2, by + cell * 3 + 11 * u, text)
+        }
     }
 
     /** One piece: type colour, square for you / circle for them, dots for where it can step. */
