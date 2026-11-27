@@ -19,6 +19,8 @@ class CoachFixButton(ctx: Context, private val onFire: () -> Unit) : View(ctx) {
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.LEFT; isFakeBoldText = true }
     private var downAt = 0L
+    /** Being held right now (the screen reader waits, and doesn't hide it). */
+    val held get() = downAt != 0L
     var scale = 1f
 
     companion object { const val HOLD_MS = 1000L }
@@ -71,7 +73,9 @@ class CoachFixButton(ctx: Context, private val onFire: () -> Unit) : View(ctx) {
  * eraser) and tap squares, + / − for the benches, choose whose move it is, then Done.
  * Laid out like the game: your side on the left.
  */
-class CoachFixView(ctx: Context, start: Puka.State, private val title: String = "Fix board", private val onDone: (Puka.State?) -> Unit) : View(ctx) {
+class CoachFixView(ctx: Context, start: Puka.State, private val title: String = "Fix board", unknown: Set<Int> = emptySet(), private val onDone: (Puka.State?) -> Unit) : View(ctx) {
+    /** Squares the screen reader couldn't see: marked with ? until tapped. */
+    private val unsure = unknown.toMutableSet()
     private val d = ctx.resources.displayMetrics.density
     private val painter = CoachPainter(d)
     var s = start.copy()
@@ -106,7 +110,13 @@ class CoachFixView(ctx: Context, start: Puka.State, private val title: String = 
             c.drawRoundRect(r, 10 * d, 10 * d, fill)
             val p = s.b[i]
             if (p != 0) painter.piece(c, r.centerX(), r.centerY(), cell * 0.34f, Puka.typ(p), Puka.own(p))
-            hits.add(RectF(r) to { s.b[i] = if (pick == 0) 0 else pick or (if (pickSide == 1) 8 else 0); invalidate() })
+            if (i in unsure) {
+                stroke.color = CoachPainter.LEADER; stroke.strokeWidth = 3 * d
+                c.drawRoundRect(r, 10 * d, 10 * d, stroke)
+                text.textSize = 26 * d; text.color = CoachPainter.LEADER
+                c.drawText("?", r.centerX(), r.centerY() + 9 * d, text)
+            }
+            hits.add(RectF(r) to { unsure.remove(i); s.b[i] = if (pick == 0) 0 else pick or (if (pickSide == 1) 8 else 0); invalidate() })
         }
         // benches with + / −
         for (side in 0..1) {

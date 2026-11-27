@@ -65,6 +65,7 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
             val s = Puka.empty(if (myTurn == false) 1 else 0, tall)
             for ((y, row) in grid.withIndex()) for ((x, c) in row.withIndex()) {
                 if (c.isEmpty()) continue
+                if (c == "?") return null
                 val t = when (c[1]) { 'L' -> Puka.LEADER; 'W' -> Puka.WHALE; 'D' -> Puka.DOLPHIN; 'T' -> Puka.TURTLE; 'G' -> Puka.GOLD; else -> return null }
                 s.b[s.idx(x, y)] = t or (if (c[0] == 'O') 8 else 0)
             }
@@ -81,6 +82,7 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
         val red = BooleanArray(n); val gold = BooleanArray(n); val whale = BooleanArray(n)
         val pink = BooleanArray(n); val green = BooleanArray(n); val face = BooleanArray(n)
         val white = BooleanArray(n)
+        val tile = BooleanArray(n) // the white top of a tile
     }
 
     private var w = W
@@ -113,6 +115,7 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
             m.green[i] = hh > 85 && hh < 150 && s > 0.45f && v > 0.4f
             m.face[i] = hh > 5 && hh < 45 && s > 0.06f && s < 0.4f && v > 0.85f
             m.white[i] = s < 0.1f && v > 0.93f
+            m.tile[i] = s < 0.2f && v > 0.78f
         }
         for (l in LABELS) for (y in l[1] until minOf(l[3], h)) for (x in l[0] until minOf(l[2], w)) { m.org[y * w + x] = false; m.blu[y * w + x] = false }
         return m
@@ -312,6 +315,12 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
         val cen = Array(rows.size) { arrayOfNulls<DoubleArray>(4) }
         for ((ry, r) in rows.withIndex()) for ((cx, c) in r.cols.withIndex()) {
             own[ry][cx] = ownerOf(m, r.y0, r.y1, c[0], c[1])
+            if (own[ry][cx] == '.') {
+                // no markings: an empty tile shows its white top; if it's mostly covered (a piece in
+                // front, or one standing on it with its markings hidden) it's unknown, not empty
+                val hh = r.y1 - r.y0; val ww = c[1] - c[0]
+                if (mean(m.tile, (r.y0 + 0.1 * hh).toInt(), (r.y1 - 0.1 * hh).toInt(), (c[0] + 0.1 * ww).toInt(), (c[1] - 0.1 * ww).toInt()) < 0.8) own[ry][cx] = '?'
+            }
             var x = (c[0] + c[1]) / 2.0; x += 0.08 * (x - 640)
             cen[ry][cx] = doubleArrayOf((r.y0 + r.y1) / 2.0, x)
         }
@@ -323,7 +332,7 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
             var bl = blobs(m, x0, x1, 0, minOf(rows.last().y1, h), minA)
             val used = HashSet<Blob>()
             for (r in rows.indices.reversed()) {
-                if (own[r][c] == '.') continue
+                if (own[r][c] == '.' || own[r][c] == '?') continue
                 val (cy, cx) = cen[r][c]!!.let { it[0] to it[1] }
                 val ey = cy - 160
                 val pick = bl.filter { it !in used && it.y - ey > -100 && it.y - ey < 70 && Math.abs(it.x - cx) < 85 }.minByOrNull { Math.abs(it.y - ey) }
@@ -334,7 +343,7 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
                 } else kind[r][c] = '?'
             }
         }
-        val grid = rows.indices.map { r -> (0 until 4).map { c -> if (own[r][c] == '.') "" else "${own[r][c]}${kind[r][c]}" } }
+        val grid = rows.indices.map { r -> (0 until 4).map { c -> when (own[r][c]) { '.' -> ""; '?' -> "?"; else -> "${own[r][c]}${kind[r][c]}" } } }
         return Reading(n, score, grid, benches(m), undoCount(px), myTurn(m))
     }
 }

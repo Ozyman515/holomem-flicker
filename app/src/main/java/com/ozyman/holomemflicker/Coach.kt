@@ -68,7 +68,7 @@ class Coach(
 
     var onSettings: (() -> Unit)? = null
     /** Opens the touch board editor (the overlay's Fix board window). */
-    var onFix: (() -> Unit)? = null
+    var onFix: ((Puka.State?, Set<Int>) -> Unit)? = null
     /** Screen reader test on/off (the overlay runs the capture loop). */
     var onScreenTest: ((Boolean) -> Unit)? = null
     /** Shares the screen reader test log. */
@@ -98,6 +98,7 @@ class Coach(
         val g = r.getJSONArray("grid")
         for (y in 0 until g.length()) { val row = g.getJSONArray(y); for (x in 0 until row.length()) {
             val c = row.getString(x); if (c.isEmpty()) continue
+            if (c[0] == '?') { unk.add(s.idx(x, y)); continue }
             val i = s.idx(x, y)
             val t = when (c.getOrNull(1)) { 'L' -> Puka.LEADER; 'W' -> Puka.WHALE; 'D' -> Puka.DOLPHIN; 'T' -> Puka.TURTLE; 'G' -> Puka.GOLD; else -> 0 }
             if (t == 0) { unk.add(i); s.b[i] = Puka.TURTLE or (if (c[0] == 'O') 8 else 0) } else s.b[i] = t or (if (c[0] == 'O') 8 else 0)
@@ -152,7 +153,7 @@ class Coach(
             Phase.START -> listOf(
                 Item("Normal start: I go first") { newMatch(0) },
                 Item("Normal start: they go first") { newMatch(1) },
-                Item("Stage's own setup", "set up in Fix board") { onFix?.invoke() },
+                Item("Stage's own setup", "set up in Fix board") { onFix?.invoke(null, emptySet()) },
                 Item("Panel settings") { goTo(Phase.SETTINGS) },
                 Item("Screen reader test") { startScreenTest() },
             )
@@ -196,6 +197,8 @@ class Coach(
                 val s = scan
                 if (s != null && scanUnknown.isEmpty() && Puka.leaderPos(s, 0) >= 0 && Puka.leaderPos(s, 1) >= 0)
                     add(Item("Start a match from this board") { stopScreenTest(); startFrom(s) })
+                if (s != null) add(Item(if (scanUnknown.isEmpty()) "Check it in Stage setup first" else "Set up from this board (check the ?)") {
+                    val u = scanUnknown; stopScreenTest(); goTo(Phase.START); onFix?.invoke(s, u) })
                 add(Item("Share test log") { onShareLog?.invoke() })
                 add(Item("Stop test") { stopScreenTest(); goTo(back) })
             }

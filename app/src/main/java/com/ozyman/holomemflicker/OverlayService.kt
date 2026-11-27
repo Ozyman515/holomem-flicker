@@ -280,7 +280,7 @@ class OverlayService : Service() {
         settings = Coach.Settings.from(json(Prefs.getStr(this, "coach.settings", ""))),
     ).also { c ->
         c.onSave = { Prefs.putStr(this, "coach.state", c.toJson().toString()) }
-        c.onFix = { handler.post { openFix(fresh = true) } }
+        c.onFix = { s, unk -> handler.post { openFix(fresh = true, from = s, unknown = unk) } }
         c.onScreenTest = { on -> if (on) { try { java.io.File(filesDir, "puka-reader-log.txt").appendText("---- test started ${java.util.Date()} ----\n") } catch (_: Throwable) {}; startScan() } }
         c.onShareLog = { shareScanLog() }
         c.onSettings = {
@@ -324,11 +324,11 @@ class OverlayService : Service() {
     }
 
     /** [fresh] = setting up a stage's own starting board for a new match (any size). */
-    private fun openFix(fresh: Boolean = false) {
+    private fun openFix(fresh: Boolean = false, from: Puka.State? = null, unknown: Set<Int> = emptySet()) {
         if (fixView != null || !coachOpen || !Settings.canDrawOverlays(this)) return
         removeFixButton()
-        val start = if (fresh) Puka.empty(0, coach().state.w) else coach().state
-        val v = CoachFixView(this, start, if (fresh) "Stage setup" else "Fix board") { result ->
+        val start = from ?: if (fresh) Puka.empty(0, coach().state.w) else coach().state
+        val v = CoachFixView(this, start, if (fresh) "Stage setup" else "Fix board", unknown) { result ->
             handler.post {
                 closeFix()
                 if (result != null) { if (fresh) coach().startFrom(result) else coach().setPosition(result) }
@@ -351,7 +351,7 @@ class OverlayService : Service() {
     private fun setHidden(on: Boolean) {
         scanHidden = on
         view?.visibility = if (on) View.INVISIBLE else View.VISIBLE
-        fixButton?.visibility = if (on) View.INVISIBLE else View.VISIBLE
+        fixButton?.let { if (!(on && it.held)) it.visibility = if (on) View.INVISIBLE else View.VISIBLE }
     }
 
     private fun startScan() {
@@ -364,7 +364,7 @@ class OverlayService : Service() {
                 // only while the coach wants it (following a turn, or the screen test), and not under Fix board
                 val want = java.util.concurrent.atomic.AtomicBoolean(false)
                 val asked = java.util.concurrent.CountDownLatch(1)
-                handler.post { want.set(coachOpen && fixView == null && coach?.wantsReadings == true); asked.countDown() }
+                handler.post { want.set(coachOpen && fixView == null && fixButton?.held != true && coach?.wantsReadings == true); asked.countDown() }
                 asked.await()
                 if (!want.get()) { Thread.sleep(300); continue }
                 // hide the panel so it isn't in the picture, give the screen two frames to redraw

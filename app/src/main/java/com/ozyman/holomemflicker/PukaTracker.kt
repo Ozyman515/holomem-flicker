@@ -36,7 +36,11 @@ class PukaTracker {
 
         fun owners(s: Puka.State): String = String(CharArray(s.n) { val p = s.b[it]; if (p == 0) '.' else if (Puka.own(p) == 0) 'B' else 'O' })
 
-        fun diff(a: String, b: String) = a.indices.count { a[it] != b[it] }
+        /** Tiles that disagree; unknown tiles ('?', covered on screen) never count. */
+        fun diff(a: String, b: String) = a.indices.count { a[it] != b[it] && a[it] != '?' && b[it] != '?' }
+
+        /** Squares the move changed that can't be seen on screen (prefer moves you can see). */
+        fun unseen(a: Puka.State, b: Puka.State, seen: String) = a.b.indices.count { a.b[it] != b.b[it] && seen[it] == '?' }
 
         /** The reading in board order: owners and (where known) pieces. */
         fun fromReading(r: PukaReader.Reading, w: Int): Pair<String, IntArray>? {
@@ -48,6 +52,7 @@ class PukaTracker {
                 if (c.isEmpty()) continue
                 val i = s.idx(x, y)
                 own[i] = c[0]
+                if (c[0] == '?') continue
                 val t = when (c.getOrNull(1)) { 'L' -> Puka.LEADER; 'W' -> Puka.WHALE; 'D' -> Puka.DOLPHIN; 'T' -> Puka.TURTLE; 'G' -> Puka.GOLD; else -> 0 }
                 if (t != 0) piece[i] = t or (if (c[0] == 'O') 8 else 0)
             }
@@ -67,7 +72,8 @@ class PukaTracker {
         r.undos?.let { if (undos == null) undos = it }
         if (seen == lastSeen) stable++ else { lastSeen = seen; stable = 1 }
         if (stable < 2) return Result.Nothing
-        inSync = diff(owners(state), seen) <= TOL
+        val d0 = diff(owners(state), seen)
+        inSync = d0 == 0
         if (inSync) { acted = null; if (r.undos != null) undos = r.undos; return Result.Nothing }
         val key = seen + "|" + state.key()
         if (key == acted) return Result.Nothing // already answered for this board and position (e.g. waiting on a pick)
@@ -87,7 +93,7 @@ class PukaTracker {
             for (m in Puka.moves(st)) {
                 val n = Puka.apply(st, m)
                 val d = diff(owners(n), seen)
-                if (d <= TOL) cands.add(Cand(agree(n, piece) - 10 * d - (if (side != state.turn) 3 else 0), listOf(m)))
+                if (d <= TOL && d < d0) cands.add(Cand(agree(n, piece) - 10 * d - 2 * unseen(st, n, seen) - (if (side != state.turn) 3 else 0), listOf(m)))
             }
         }
         if (cands.isEmpty()) {
@@ -97,12 +103,12 @@ class PukaTracker {
                 for (m2 in Puka.moves(n)) {
                     val n2 = Puka.apply(n, m2)
                     val d = diff(owners(n2), seen)
-                    if (d <= TOL) cands.add(Cand(agree(n2, piece) - 10 * d - 5, listOf(m, m2)))
+                    if (d <= TOL && d < d0) cands.add(Cand(agree(n2, piece) - 10 * d - 5 - 2 * unseen(state, n2, seen), listOf(m, m2)))
                 }
             }
         }
         acted = key
-        if (cands.isEmpty()) return Result.Lost
+        if (cands.isEmpty()) return if (d0 > TOL) Result.Lost else Result.Nothing // one odd tile: likely a misread
         val best = cands.maxOf { it.score }
         val top = cands.filter { it.score == best }
         if (top.size == 1) return Result.Moves(top[0].moves)
