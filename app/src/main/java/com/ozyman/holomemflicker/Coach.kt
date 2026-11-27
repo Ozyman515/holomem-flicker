@@ -85,7 +85,7 @@ class Coach(
         if (!j.optBoolean("ok")) { scanHead = "Capture failed"; scanText = j.optString("error"); changed(); return }
         val r = j.getJSONObject("reading")
         val cap = j.optLong("capMs"); val conv = j.optLong("convMs"); val rd = j.optLong("readMs")
-        val timing = "grab ${cap} ms + scale ${conv} ms + read ${rd} ms"
+        val timing = "grab ${cap + conv} ms · read ${rd} ms"
         if (!r.optBoolean("normal")) {
             scanHead = "Rotate back to read the board"
             scanText = "Not the normal view (%.2f) · %s".format(r.optDouble("score"), timing)
