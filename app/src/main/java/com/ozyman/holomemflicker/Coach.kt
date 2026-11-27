@@ -22,7 +22,7 @@ class Coach(
     val settings: Settings = Settings(),
     private val thinkMs: Long = 1500,
 ) {
-    enum class Phase { START, MY_TURN, THEIR_TURN, OTHER, MANUAL, SETTINGS, MOVE_PANEL, OVER, SCREEN_TEST }
+    enum class Phase { START, MY_TURN, THEIR_TURN, OTHER, MANUAL, SETTINGS, MOVE_PANEL, OVER, SCREEN_TEST, PICK }
 
     /** Highlight colours: the best move for you is red, a picked move of theirs is violet. */
     enum class Role { BEST, THEIRS, MANUAL }
@@ -30,8 +30,8 @@ class Coach(
     class Item(val label: String, val hint: String = "", val run: () -> Unit)
 
     /** Panel look, saved by the overlay. Opacity is a percent of the overlay's own limit. */
-    class Settings(var scale: Int = 100, var opacity: Int = 100, var x: Float = 0.015f, var y: Float = 0.16f) {
-        fun toJson() = JSONObject().put("scale", scale).put("opacity", opacity).put("x", x.toDouble()).put("y", y.toDouble())
+    class Settings(var scale: Int = 100, var opacity: Int = 100, var x: Float = 0.015f, var y: Float = 0.16f, var follow: Boolean = true) {
+        fun toJson() = JSONObject().put("scale", scale).put("opacity", opacity).put("x", x.toDouble()).put("y", y.toDouble()).put("follow", follow)
         companion object {
             fun from(o: JSONObject?) = Settings().apply {
                 if (o == null) return@apply
@@ -39,6 +39,7 @@ class Coach(
                 opacity = o.optInt("opacity", 100).coerceIn(MIN_OPACITY, 100)
                 x = o.optDouble("x", 0.015).toFloat().coerceIn(0f, 1f)
                 y = o.optDouble("y", 0.16).toFloat().coerceIn(0f, 1f)
+                follow = o.optBoolean("follow", true)
             }
         }
     }
@@ -124,6 +125,7 @@ class Coach(
             Phase.SETTINGS -> "Panel settings"
             Phase.MOVE_PANEL -> "Move the panel with the D-pad"
             Phase.SCREEN_TEST -> scanHead
+            Phase.PICK -> if (state.turn == 0) "Which move did you make?" else "Which move did they make?"
             Phase.OVER -> when {
                 drawn -> "Draw"
                 Puka.winner(state) == 0 -> "You win!"
@@ -133,13 +135,14 @@ class Coach(
 
     val detail: String
         get() = when (phase) {
-            Phase.MY_TURN -> best?.let { b ->
+            Phase.MY_TURN -> (if (seen.isNotEmpty()) "$seen · " else "") + (best?.let { b ->
                 verdict(b.score, 0) + " · " + Puka.shortText(state, b.move)
-            } ?: ""
-            Phase.THEIR_TURN -> if (thinking || replies.isEmpty()) "" else "Most likely first · A picks · Other… for anything else"
+            } ?: "")
+            Phase.THEIR_TURN -> if (seen.isNotEmpty()) seen else if (thinking || replies.isEmpty()) "" else if (settings.follow) "Watching the screen for their move · or pick it here" else "Most likely first · A picks · Other… for anything else"
             Phase.MANUAL -> "A selects · B goes back"
             Phase.MOVE_PANEL -> "A or B when done"
             Phase.SCREEN_TEST -> scanText
+            Phase.PICK -> "A few moves fit what's on screen · A picks"
             Phase.OVER -> if (drawn) "Match ended in a draw" else "A wrong entry? Undo the last move puts the board back"
             else -> note
         }
@@ -175,6 +178,7 @@ class Coach(
                 Item("Size", "${settings.scale}%  ◀ ▶") {},
                 Item("See-through", "${100 - settings.opacity}%  ◀ ▶") {},
                 Item("Move the panel") { goTo(Phase.MOVE_PANEL) },
+                Item("Follow the game by itself", if (settings.follow) "on  ◀ ▶" else "off  ◀ ▶") { settings.follow = !settings.follow; onSettings?.invoke() },
                 Item("Back") { goTo(if (back == Phase.START) Phase.START else Phase.OTHER) },
             )
             Phase.OVER -> buildList {
@@ -184,6 +188,10 @@ class Coach(
                 add(Item("New match: they go first") { newMatch(1) })
             }
             Phase.MANUAL, Phase.MOVE_PANEL -> emptyList()
+            Phase.PICK -> buildList {
+                for (m in pickOptions) add(Item(Puka.shortText(state, m)) { play(m) })
+                add(Item("Other…") { openOther() })
+            }
             Phase.SCREEN_TEST -> buildList {
                 val s = scan
                 if (s != null && scanUnknown.isEmpty() && Puka.leaderPos(s, 0) >= 0 && Puka.leaderPos(s, 1) >= 0)
@@ -198,6 +206,7 @@ class Coach(
         get() = when (phase) {
             Phase.MY_TURN -> if (thinking) null else best?.let { it.move to Role.BEST }
             Phase.THEIR_TURN -> if (thinking) null else replies.getOrNull(sel)?.let { it to Role.THEIRS }
+            Phase.PICK -> pickOptions.getOrNull(sel)?.let { it to Role.THEIRS }
             else -> null
         }
 
@@ -241,7 +250,7 @@ class Coach(
             KEY_LEFT, KEY_RIGHT -> if (phase == Phase.SETTINGS) adjust(if (code == KEY_LEFT) -1 else 1)
             KEY_A -> its.getOrNull(sel)?.run?.invoke()
             KEY_B -> when (phase) {
-                Phase.MY_TURN, Phase.THEIR_TURN -> openOther()
+                Phase.MY_TURN, Phase.THEIR_TURN, Phase.PICK -> openOther()
                 Phase.OTHER -> goTo(back)
                 Phase.SCREEN_TEST -> { stopScreenTest(); goTo(back) }
                 Phase.SETTINGS -> goTo(if (back == Phase.START) Phase.START else Phase.OTHER)
@@ -254,6 +263,7 @@ class Coach(
         when (sel) {
             0 -> settings.scale = (settings.scale + dir * 10).coerceIn(MIN_SCALE, MAX_SCALE)
             1 -> settings.opacity = (settings.opacity - dir * 10).coerceIn(MIN_OPACITY, 100)
+            3 -> settings.follow = !settings.follow
             else -> return
         }
         onSettings?.invoke()
@@ -305,13 +315,52 @@ class Coach(
     // ---------------------------------------------------------------- game flow
 
     fun newMatch(first: Int) {
+        tracker.reset(); seen = ""
         history.clear(); played.clear()
         state = Puka.start().also { it.turn = first }
         drawn = false
         goTo(turnPhase())
     }
 
+    // ---- following the game from screen readings ----
+    private val tracker = PukaTracker()
+    private var pickOptions: List<Puka.Move> = emptyList()
+    /** Last thing seen on screen, shown under the prompt. */
+    var seen = ""; private set
+    /** True when the overlay should keep reading the screen. */
+    val wantsReadings get() = phase == Phase.SCREEN_TEST || (settings.follow && (phase == Phase.MY_TURN || phase == Phase.THEIR_TURN || phase == Phase.PICK))
+
+    fun onReading(r: PukaReader.Reading) {
+        if (!settings.follow || (phase != Phase.MY_TURN && phase != Phase.THEIR_TURN && phase != Phase.PICK)) return
+        if (!r.normalView) { if (seen != "Rotate back to follow the game") { seen = "Rotate back to follow the game"; changed() }; return }
+        when (val res = tracker.update(r, state, history)) {
+            is PukaTracker.Result.Nothing -> if (tracker.inSync && seen.startsWith("Can't")) seen = ""
+            is PukaTracker.Result.Moves -> {
+                val txt = ArrayList<String>()
+                for (m in res.moves) { txt.add((if (state.turn == 0) "you: " else "they: ") + Puka.shortText(state, m)); playAuto(m) }
+                seen = "Saw " + txt.joinToString(", ")
+            }
+            is PukaTracker.Result.Undo -> {
+                repeat(res.steps) { if (history.isNotEmpty()) { state = history.removeAt(history.size - 1); played.removeAt(played.size - 1) } }
+                drawn = false
+                goTo(turnPhase())
+                seen = "Saw an Undo (undos left: ${tracker.undos ?: "?"})"
+            }
+            is PukaTracker.Result.Ambiguous -> { pickOptions = res.options; goTo(Phase.PICK); seen = "" }
+            is PukaTracker.Result.Lost -> seen = "Can't match the screen to the board: Fix board, or enter the move in Other…"
+        }
+        changed()
+    }
+
+    /** A move seen on screen (not entered with the controller). */
+    private fun playAuto(m: Puka.Move) {
+        history.add(state); played.add(m)
+        state = Puka.apply(state, m)
+        goTo(if (Puka.terminal(state) != 0) Phase.OVER else turnPhase())
+    }
+
     fun play(m: Puka.Move) {
+        seen = ""
         history.add(state)
         played.add(m)
         state = Puka.apply(state, m)
@@ -344,6 +393,7 @@ class Coach(
 
     /** A new match from a stage's own starting board (any size), set up in Fix board. */
     fun startFrom(s: Puka.State) {
+        tracker.reset(); seen = ""
         history.clear(); played.clear()
         state = s.copy()
         drawn = false
@@ -422,7 +472,7 @@ class Coach(
             .put("state", st(state))
             .put("history", JSONArray(history.map { st(it) }))
             .put("played", JSONArray(played.map { JSONArray(listOf(it.from, it.to, it.drop)) }))
-            .put("phase", (if (phase == Phase.OTHER || phase == Phase.SETTINGS || phase == Phase.MANUAL || phase == Phase.MOVE_PANEL || phase == Phase.SCREEN_TEST) back else phase).name)
+            .put("phase", (if (phase == Phase.OTHER || phase == Phase.SETTINGS || phase == Phase.MANUAL || phase == Phase.MOVE_PANEL || phase == Phase.SCREEN_TEST || phase == Phase.PICK) back else phase).name)
             .put("drawn", drawn)
     }
 

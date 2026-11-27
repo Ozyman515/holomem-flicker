@@ -162,7 +162,7 @@ class OverlayService : Service() {
             }
             editor?.onPoll(pressedNow)
             val co = o.optBoolean("coach")
-            if (co && !coachOpen) coach().resume()
+            if (co && !coachOpen) { coach().resume(); coachOpen = true; startScan() }
             if (!co && coachOpen) { closeFix(); scanning = false; coach?.let { if (it.phase == Coach.Phase.SCREEN_TEST) it.onKey(Coach.KEY_B) } }
             coachOpen = co
             val ck = o.optString("coachKey")
@@ -281,7 +281,7 @@ class OverlayService : Service() {
     ).also { c ->
         c.onSave = { Prefs.putStr(this, "coach.state", c.toJson().toString()) }
         c.onFix = { handler.post { openFix(fresh = true) } }
-        c.onScreenTest = { on -> if (on) startScan() else scanning = false }
+        c.onScreenTest = { on -> if (on) { try { java.io.File(filesDir, "puka-reader-log.txt").appendText("---- test started ${java.util.Date()} ----\n") } catch (_: Throwable) {}; startScan() } }
         c.onShareLog = { shareScanLog() }
         c.onSettings = {
             Prefs.putStr(this, "coach.settings", c.settings.toJson().toString())
@@ -357,11 +357,16 @@ class OverlayService : Service() {
     private fun startScan() {
         if (scanning) return
         scanning = true
-        try { java.io.File(filesDir, "puka-reader-log.txt").appendText("---- test started ${java.util.Date()} ----\n") } catch (_: Throwable) {}
         scanWorker.execute {
             while (scanning && alive) {
                 val svc = service
                 if (svc == null) { Thread.sleep(500); continue }
+                // only while the coach wants it (following a turn, or the screen test), and not under Fix board
+                val want = java.util.concurrent.atomic.AtomicBoolean(false)
+                val asked = java.util.concurrent.CountDownLatch(1)
+                handler.post { want.set(coachOpen && fixView == null && coach?.wantsReadings == true); asked.countDown() }
+                asked.await()
+                if (!want.get()) { Thread.sleep(300); continue }
                 // hide the panel so it isn't in the picture, give the screen two frames to redraw
                 val hidden = java.util.concurrent.CountDownLatch(1)
                 handler.post { setHidden(true); hidden.countDown() }
@@ -374,13 +379,17 @@ class OverlayService : Service() {
                 val res = try { svc.readScreen(digitsJson) } catch (e: Throwable) { JSONObject().put("ok", false).put("error", e.toString()).toString() }
                 val j = try { JSONObject(res) } catch (_: Throwable) { JSONObject().put("ok", false).put("error", "bad reply") }
                 j.put("hiddenMs", hiddenMs)
-                try {
+                if (coach?.phase == Coach.Phase.SCREEN_TEST || !j.optBoolean("ok")) try {
                     val f = java.io.File(filesDir, "puka-reader-log.txt")
                     if (f.length() > 400_000) f.writeText("")
                     f.appendText(j.toString() + "\n")
                 } catch (_: Throwable) {}
-                handler.post { coach?.showScan(j) }
-                Thread.sleep(700)
+                handler.post {
+                    val c = coach ?: return@post
+                    if (c.phase == Coach.Phase.SCREEN_TEST) c.showScan(j)
+                    else if (j.optBoolean("ok")) try { c.onReading(PukaReader.Reading.fromJson(j.getJSONObject("reading"))) } catch (_: Throwable) {}
+                }
+                Thread.sleep(600)
             }
             handler.post { if (scanHidden) setHidden(false) }
         }

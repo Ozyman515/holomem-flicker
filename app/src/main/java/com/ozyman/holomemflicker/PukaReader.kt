@@ -48,6 +48,17 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
             .put("bench", JSONArray(benches.map { b -> JSONArray(b.map { it.toString() }) }))
             .put("undos", undos ?: -1).put("myTurn", myTurn?.let { if (it) 1 else 0 } ?: -1)
 
+        companion object {
+            fun fromJson(o: JSONObject): Reading {
+                val g = o.getJSONArray("grid"); val b = o.getJSONArray("bench")
+                val mt = o.optInt("myTurn", -1); val u = o.optInt("undos", -1)
+                return Reading(o.getInt("tall"), o.getDouble("score"),
+                    (0 until g.length()).map { y -> val row = g.getJSONArray(y); (0 until row.length()).map { row.getString(it) } },
+                    (0..1).map { s -> val a = b.getJSONArray(s); (0 until a.length()).map { a.getString(it)[0] } },
+                    if (u < 0) null else u, if (mt < 0) null else mt == 1)
+            }
+        }
+
         /** The board as a coach position (benches read too; whose move from the Undo button, else yours). */
         fun toState(): Puka.State? {
             if (!normalView) return null
