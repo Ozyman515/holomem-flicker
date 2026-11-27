@@ -161,6 +161,34 @@ class CoachScreensTest {
         shot("coach-13-screen-test-unsure", c)
     }
 
+    private fun readingOf(s: Puka.State, undos: Int = 1): PukaReader.Reading {
+        val grid = (0 until s.w).map { y -> (0 until s.rows).map { x ->
+            val p = s.b[s.idx(x, y)]
+            if (p == 0) "" else (if (Puka.own(p) == 0) "B" else "O") + "?LDWTG"[Puka.typ(p)]
+        } }
+        return PukaReader.Reading(s.w, 0.3, grid, listOf(emptyList(), emptyList()), undos, null)
+    }
+
+    @Test
+    fun following() {
+        // they move; the coach sees it on screen and moves on to your turn
+        val c = coach(); c.newMatch(1)
+        val m = Puka.moves(c.state).first { it.from == Puka.index(2, 1) } // their Turtle takes yours
+        val after = Puka.apply(c.state, m)
+        repeat(2) { c.onReading(readingOf(after)) }
+        shot("coach-14-saw-their-move", c)
+        // two of their moves fit what's on screen equally: ask
+        val d = coach(); d.newMatch(1)
+        val s = Puka.empty(1)
+        s.b[Puka.index(0, 1)] = Puka.LEADER; s.b[Puka.index(3, 1)] = Puka.LEADER or 8
+        s.b[Puka.index(3, 0)] = Puka.DOLPHIN or 8; s.b[Puka.index(3, 2)] = Puka.DOLPHIN or 8
+        d.setPosition(s)
+        val moved = s.copy(); moved.b[Puka.index(3, 0)] = 0; moved.b[Puka.index(2, 0)] = Puka.DOLPHIN or 8; moved.turn = 0
+        val r = readingOf(moved).let { PukaReader.Reading(it.tall, it.score, it.grid.map { row -> row.map { c -> if (c.isEmpty()) c else c[0] + "?" } }, it.benches, 1, null) }
+        repeat(2) { d.onReading(r) }
+        shot("coach-15-which-move", d)
+    }
+
     @Test
     fun fixBoard() {
         val ctx = RuntimeEnvironment.getApplication()
