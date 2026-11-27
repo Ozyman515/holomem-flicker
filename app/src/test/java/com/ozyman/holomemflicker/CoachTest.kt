@@ -28,7 +28,7 @@ class CoachTest {
         assertEquals(Coach.Phase.MY_TURN, c.phase)
         val best = c.best!!.move
         assertEquals(Coach.Role.BEST, c.highlight!!.second)
-        assertEquals("Play best move?", c.prompt)
+        assertEquals("Best move", c.prompt)
         c.onKey(A) // yes
         assertEquals(Coach.Phase.THEIR_TURN, c.phase)
         assertEquals(best, c.last)

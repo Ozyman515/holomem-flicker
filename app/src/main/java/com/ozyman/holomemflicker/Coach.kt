@@ -118,7 +118,7 @@ class Coach(
     val prompt: String
         get() = when (phase) {
             Phase.START -> "New match: who moves first?"
-            Phase.MY_TURN -> if (thinking) "Thinking…" else if (best == null) "No legal move" else "Play best move?"
+            Phase.MY_TURN -> if (thinking) "Thinking…" else if (best == null) "No legal move" else "Best move"
             Phase.THEIR_TURN -> if (thinking) "Thinking…" else "Their move?"
             Phase.OTHER -> "Other…"
             Phase.MANUAL -> if (picked == null) (if (state.turn == 0) "Your move: pick a piece" else "Their move: pick a piece") else "Pick the square it moves to"
@@ -157,7 +157,7 @@ class Coach(
                 Item("Screen reader test") { startScreenTest() },
             )
             Phase.MY_TURN -> buildList {
-                best?.let { b -> add(Item("Yes, play it", "A") { play(b.move) }) }
+                best?.let { b -> add(Item(if (settings.follow) "I played it (or just play it in the game)" else "I played it", "A") { play(b.move) }) }
                 add(Item("Other…") { openOther() })
             }
             Phase.THEIR_TURN -> buildList {
