@@ -367,9 +367,11 @@ class OverlayService : Service() {
                 handler.post { setHidden(true); hidden.countDown() }
                 hidden.await(); Thread.sleep(50)
                 val t0 = SystemClock.uptimeMillis()
-                val res = try { svc.readScreen(digitsJson) } catch (e: Throwable) { JSONObject().put("ok", false).put("error", e.toString()).toString() }
+                // only the screenshot happens while the panel is hidden; reading happens after it's back
+                try { svc.grabScreen() } catch (_: Throwable) {}
                 val hiddenMs = SystemClock.uptimeMillis() - t0 + 50
                 handler.post { setHidden(false) }
+                val res = try { svc.readScreen(digitsJson) } catch (e: Throwable) { JSONObject().put("ok", false).put("error", e.toString()).toString() }
                 val j = try { JSONObject(res) } catch (_: Throwable) { JSONObject().put("ok", false).put("error", "bad reply") }
                 j.put("hiddenMs", hiddenMs)
                 try {

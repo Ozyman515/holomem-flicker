@@ -147,33 +147,27 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
         return if (bm > 0.05 && bm > 3 * om) 'B' else if (om > 0.015 && om > 3 * bm) 'O' else '.'
     }
 
-    // ---- binary morphology on a sub-window (3x3, zero border, like scipy) ----
-    private fun dilate(a: BooleanArray, ww: Int, hh: Int, it: Int): BooleanArray {
-        var cur = a
-        repeat(it) {
-            val n = BooleanArray(cur.size)
-            for (y in 0 until hh) for (x in 0 until ww) {
-                var v = false
-                loop@ for (dy in -1..1) for (dx in -1..1) { val yy = y + dy; val xx = x + dx; if (yy in 0 until hh && xx in 0 until ww && cur[yy * ww + xx]) { v = true; break@loop } }
-                n[y * ww + x] = v
-            }
-            cur = n
-        }
-        return cur
+    // ---- binary morphology on a sub-window: square (2r+1) windows, zero border (same as r rounds of 3x3, like scipy) ----
+    private fun boxCount(a: BooleanArray, ww: Int, hh: Int): IntArray {
+        val p = IntArray((ww + 1) * (hh + 1))
+        for (y in 0 until hh) { var row = 0; for (x in 0 until ww) { if (a[y * ww + x]) row++; p[(y + 1) * (ww + 1) + x + 1] = p[y * (ww + 1) + x + 1] + row } }
+        return p
+    }
+    private fun rect(p: IntArray, ww: Int, x0: Int, y0: Int, x1: Int, y1: Int) =
+        p[y1 * (ww + 1) + x1] - p[y0 * (ww + 1) + x1] - p[y1 * (ww + 1) + x0] + p[y0 * (ww + 1) + x0]
+
+    private fun dilate(a: BooleanArray, ww: Int, hh: Int, r: Int): BooleanArray {
+        val p = boxCount(a, ww, hh); val n = BooleanArray(a.size)
+        for (y in 0 until hh) for (x in 0 until ww)
+            n[y * ww + x] = rect(p, ww, maxOf(x - r, 0), maxOf(y - r, 0), minOf(x + r + 1, ww), minOf(y + r + 1, hh)) > 0
+        return n
     }
 
-    private fun erode(a: BooleanArray, ww: Int, hh: Int, it: Int): BooleanArray {
-        var cur = a
-        repeat(it) {
-            val n = BooleanArray(cur.size)
-            for (y in 0 until hh) for (x in 0 until ww) {
-                var v = true
-                loop@ for (dy in -1..1) for (dx in -1..1) { val yy = y + dy; val xx = x + dx; if (yy !in 0 until hh || xx !in 0 until ww || !cur[yy * ww + xx]) { v = false; break@loop } }
-                n[y * ww + x] = v
-            }
-            cur = n
-        }
-        return cur
+    private fun erode(a: BooleanArray, ww: Int, hh: Int, r: Int): BooleanArray {
+        val p = boxCount(a, ww, hh); val n = BooleanArray(a.size); val full = (2 * r + 1) * (2 * r + 1)
+        for (y in r until hh - r) for (x in r until ww - r)
+            n[y * ww + x] = rect(p, ww, x - r, y - r, x + r + 1, y + r + 1) == full
+        return n
     }
 
     private class Comp(var area: Int, var y: Double, var x: Double, val pix: IntArray)
@@ -286,9 +280,15 @@ class PukaReader(private val digits: Map<Int, FloatArray> = emptyMap()) {
     }
 
     /** Undo button white (your turn) or grey (theirs); null when it can't tell. */
+    /** From the header at the top: "Your turn" starts further right than the wider "Opponent's turn". */
     private fun myTurn(m: Masks): Boolean? {
-        val f = mean(m.white, 36, 44, 1000, 1100)
-        return if (f > 0.6) true else if (f < 0.1) false else null
+        var left = -1
+        for (x in 440 until 840) {
+            var n = 0
+            for (y in 22 until minOf(48, h)) if (m.white[y * w + x]) n++
+            if (n >= 2) { left = x; break }
+        }
+        return when (left) { in 585..612 -> true; in 545..578 -> false; else -> null }
     }
 
     /** [px] = RGB pixels of a frame [width] wide (scaled to 1280 first). */

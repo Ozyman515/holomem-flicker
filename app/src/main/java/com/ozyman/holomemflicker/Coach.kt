@@ -164,6 +164,7 @@ class Coach(
             Phase.OTHER -> buildList {
                 add(Item(if (state.turn == 0) "I played a different move" else "Enter their move by hand") { openManual() })
                 if (history.isNotEmpty()) add(Item("Undo the last move") { undo() })
+                add(Item(if (state.turn == 0) "It's actually their turn" else "It's actually my turn") { switchTurn() })
                 add(Item("Match ended in a draw") { drawn = true; goTo(Phase.OVER) })
                 add(Item("New match") { goTo(Phase.START) })
                 add(Item("Panel settings") { goTo(Phase.SETTINGS) })
@@ -323,6 +324,13 @@ class Coach(
         state = history.removeAt(history.size - 1)
         played.removeAt(played.size - 1)
         drawn = false
+        goTo(turnPhase())
+    }
+
+    /** The coach has the wrong side to move (e.g. a board read when the turn wasn't clear): flip it. */
+    fun switchTurn() {
+        history.add(state); played.add(Puka.Move(-1, -1, 0))
+        state = state.copy().also { it.turn = 1 - it.turn }
         goTo(turnPhase())
     }
 

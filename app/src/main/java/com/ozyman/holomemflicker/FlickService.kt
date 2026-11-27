@@ -120,13 +120,20 @@ class FlickService : IFlickService.Stub() {
 
     private var reader: PukaReader? = null
     private var flipNext = false
+    private var grabbed: Pair<ByteArray, Long>? = null
+
+    override fun grabScreen(): String = try {
+        val g = ScreenGrab.capture(); grabbed = g
+        JSONObject().put("ok", true).put("capMs", g.second).toString()
+    } catch (e: Throwable) { grabbed = null; JSONObject().put("ok", false).put("error", (e.cause ?: e).toString()).toString() }
 
     override fun readScreen(digitsJson: String?): String {
         val out = JSONObject()
         try {
             val r = reader ?: PukaReader(try { PukaReader.loadDigits(digitsJson ?: "{}") } catch (_: Throwable) { emptyMap() }).also { reader = it }
             val t0 = System.nanoTime()
-            val (raw, capMs) = ScreenGrab.capture()
+            val (raw, capMs) = grabbed ?: ScreenGrab.capture()
+            grabbed = null
             var shot = ScreenGrab.convert(raw, capMs, flipNext)
             val t1 = System.nanoTime()
             var reading = r.read(shot.px, shot.w)

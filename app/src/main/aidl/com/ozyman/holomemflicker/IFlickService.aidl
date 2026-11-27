@@ -24,4 +24,6 @@ interface IFlickService {
     void setCoach(boolean on) = 18;
     // Puka Puka screen reader: grabs the screen and reads the board (JSON with timings).
     String readScreen(String digitsJson) = 19;
+    // Takes the screenshot only (fast); the next readScreen reads that picture.
+    String grabScreen() = 20;
 }
