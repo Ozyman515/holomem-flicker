@@ -8,7 +8,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import javax.imageio.ImageIO
+import android.graphics.BitmapFactory
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * The screen reader against frames from the user's match videos (3-tall, 4-tall, rotated view,
@@ -16,7 +17,14 @@ import javax.imageio.ImageIO
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PukaReaderTest {
+    private fun pixels(name: String): Pair<IntArray, Int> {
+        val b = BitmapFactory.decodeStream(res(name))
+        val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+        return px to b.width
+    }
+
     private fun res(name: String) = javaClass.classLoader!!.getResourceAsStream(name)!!
 
     @Test
@@ -27,10 +35,9 @@ class PukaReaderTest {
         val log = StringBuilder()
         for (n in 0 until exp.length()) {
             val e = exp.getJSONObject(n)
-            val img = ImageIO.read(res("puka-frames/" + e.getString("file")))
-            val px = img.getRGB(0, 0, img.width, img.height, null, 0, img.width)
+            val (px, iw) = pixels("puka-frames/" + e.getString("file"))
             val t0 = System.nanoTime()
-            val r = reader.read(px, img.width)
+            val r = reader.read(px, iw)
             val ms = (System.nanoTime() - t0) / 1e6
             val name = e.getString("file")
             log.append("$name ${r.tall}-tall score %.2f undo ${r.undos} myTurn ${r.myTurn} %.0f ms\n".format(r.score, ms))
@@ -54,8 +61,8 @@ class PukaReaderTest {
 
     @Test
     fun rotatedViewIsRejected() {
-        val img = ImageIO.read(res("puka-frames/1453-0060.jpg"))
-        val r = PukaReader().read(img.getRGB(0, 0, img.width, img.height, null, 0, img.width), img.width)
+        val (px, iw) = pixels("puka-frames/1453-0060.jpg")
+        val r = PukaReader().read(px, iw)
         assertTrue(!r.normalView)
     }
 }
