@@ -56,7 +56,7 @@ class CoachPainter(private val density: Float) {
         val pw = boardW + pad * 2
         val items = coach.items
         val listH = items.size * 34 * u
-        val tall = coach.state.w // 3 rows on the normal board, 4 on some stages
+        val tall = (if (coach.phase == Coach.Phase.SCREEN_TEST) coach.scan?.w else null) ?: coach.state.w // 3 rows on the normal board, 4 on some stages
         val ph = pad + 22 * u + cell * tall + 14 * u + 26 * u + 20 * u + listH + pad
         val x0 = ((w - pw) * st.x).coerceAtLeast(0f)
         val y0 = ((h - ph) * st.y).coerceAtLeast(0f)
@@ -141,7 +141,7 @@ class CoachPainter(private val density: Float) {
     }
 
     private fun drawBoard(c: Canvas, coach: Coach, bx: Float, by: Float, cell: Float) {
-        val s = coach.state
+        val s = if (coach.phase == Coach.Phase.SCREEN_TEST) (coach.scan ?: Puka.empty(0, coach.state.w)) else coach.state
         cur = s
         // squares: your back column tinted warm, theirs cool (like the game's two halves)
         for (i in 0 until s.n) {
@@ -178,6 +178,16 @@ class CoachPainter(private val density: Float) {
             if (p == 0) continue
             val r = cellRect(bx, by, cell, i)
             val lit = (hl != null && (hl.first.from == i || hl.first.to == i)) || (coach.phase == Coach.Phase.MANUAL && coach.picked?.from == i)
+            if (coach.phase == Coach.Phase.SCREEN_TEST && i in coach.scanUnknown) {
+                // owner known, piece not: a grey shape with a question mark
+                fill.color = MUTED
+                val rad = cell * 0.32f
+                if (Puka.own(p) == 0) c.drawRoundRect(r.centerX() - rad, r.centerY() - rad, r.centerX() + rad, r.centerY() + rad, rad * 0.35f, rad * 0.35f, fill)
+                else c.drawCircle(r.centerX(), r.centerY(), rad * 1.08f, fill)
+                text.textAlign = Paint.Align.CENTER; text.isFakeBoldText = true; text.textSize = rad; text.color = PANEL
+                c.drawText("?", r.centerX(), r.centerY() + rad * 0.35f, text)
+                continue
+            }
             piece(c, r.centerX(), r.centerY(), cell * (if (lit) 0.29f else 0.36f), Puka.typ(p), Puka.own(p))
         }
         if (hl != null && hl.first.from >= 0) arrow(c, cellRect(bx, by, cell, hl.first.from), cellRect(bx, by, cell, hl.first.to), if (hl.second == Coach.Role.BEST) BEST else THEIRS)
@@ -220,7 +230,7 @@ class CoachPainter(private val density: Float) {
     }
 
     private fun drawBench(c: Canvas, coach: Coach, side: Int, x: Float, by: Float, w: Float, cell: Float) {
-        val s = coach.state
+        val s = cur
         val tall = s.w
         val r = RectF(x, by, x + w, by + cell * tall)
         fill.color = Raden.alpha(INK, 0x10)

@@ -118,6 +118,32 @@ class FlickService : IFlickService.Stub() {
         engine?.setOverlay(on)
     }
 
+    private var reader: PukaReader? = null
+    private var flipNext = false
+
+    override fun readScreen(digitsJson: String?): String {
+        val out = JSONObject()
+        try {
+            val r = reader ?: PukaReader(try { PukaReader.loadDigits(digitsJson ?: "{}") } catch (_: Throwable) { emptyMap() }).also { reader = it }
+            val t0 = System.nanoTime()
+            val (raw, capMs) = ScreenGrab.capture()
+            var shot = ScreenGrab.convert(raw, capMs, flipNext)
+            val t1 = System.nanoTime()
+            var reading = r.read(shot.px, shot.w)
+            if (!reading.normalView && shot.srcH > shot.srcW) { // portrait buffer: maybe turned the wrong way
+                val other = ScreenGrab.convert(raw, capMs, !flipNext)
+                val r2 = r.read(other.px, other.w)
+                if (r2.score > reading.score) { reading = r2; shot = other; flipNext = !flipNext }
+            }
+            val t2 = System.nanoTime()
+            out.put("ok", true).put("capMs", shot.capMs).put("convMs", shot.convMs).put("totalCapMs", (t1 - t0) / 1_000_000)
+                .put("readMs", (t2 - t1) / 1_000_000).put("srcW", shot.srcW).put("srcH", shot.srcH).put("reading", reading.toJson())
+        } catch (e: Throwable) {
+            out.put("ok", false).put("error", (e.cause ?: e).toString())
+        }
+        return out.toString()
+    }
+
     override fun setCoach(on: Boolean) {
         engine?.setCoach(on)
     }

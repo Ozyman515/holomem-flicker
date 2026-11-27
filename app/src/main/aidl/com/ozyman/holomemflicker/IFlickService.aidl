@@ -22,4 +22,6 @@ interface IFlickService {
     // Long poll: returns the state once it changes past sinceSeq (or after timeoutMs).
     String waitState(long sinceSeq, int traceSince, int timeoutMs) = 17;
     void setCoach(boolean on) = 18;
+    // Puka Puka screen reader: grabs the screen and reads the board (JSON with timings).
+    String readScreen(String digitsJson) = 19;
 }

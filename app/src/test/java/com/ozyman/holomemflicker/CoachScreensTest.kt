@@ -145,6 +145,23 @@ class CoachScreensTest {
     }
 
     @Test
+    fun screenTest() {
+        val c = coach(); c.newMatch(0)
+        c.onKey(Coach.KEY_B)
+        val i = c.items.indexOfFirst { it.label == "Screen reader test" }
+        repeat(i) { c.onKey(Coach.KEY_DOWN) }
+        c.onKey(Coach.KEY_A)
+        val j = org.json.JSONObject("""{"ok":true,"capMs":183,"convMs":41,"readMs":62,"reading":{"tall":3,"score":0.27,"normal":true,
+          "grid":[["BW","BL","",""],["BD","","OT","OW"],["OD","","OT","OL"]],"bench":[["T","D"],[]],"undos":1,"myTurn":1}}""")
+        c.showScan(j)
+        shot("coach-12-screen-test", c)
+        val k = org.json.JSONObject("""{"ok":true,"capMs":175,"convMs":40,"readMs":60,"reading":{"tall":4,"score":0.55,"normal":true,
+          "grid":[["","","","BW"],["","OW","","OL"],["","BL","OD","?"],["","","","BD"]],"bench":[["T"],[]],"undos":0,"myTurn":0}}""".replace("\"?\"","\"O?\""))
+        c.showScan(k)
+        shot("coach-13-screen-test-unsure", c)
+    }
+
+    @Test
     fun fixBoard() {
         val ctx = RuntimeEnvironment.getApplication()
         Raden.apply(ctx)

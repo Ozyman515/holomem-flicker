@@ -22,7 +22,7 @@ class Coach(
     val settings: Settings = Settings(),
     private val thinkMs: Long = 1500,
 ) {
-    enum class Phase { START, MY_TURN, THEIR_TURN, OTHER, MANUAL, SETTINGS, MOVE_PANEL, OVER }
+    enum class Phase { START, MY_TURN, THEIR_TURN, OTHER, MANUAL, SETTINGS, MOVE_PANEL, OVER, SCREEN_TEST }
 
     /** Highlight colours: the best move for you is red, a picked move of theirs is violet. */
     enum class Role { BEST, THEIRS, MANUAL }
@@ -68,6 +68,48 @@ class Coach(
     var onSettings: (() -> Unit)? = null
     /** Opens the touch board editor (the overlay's Fix board window). */
     var onFix: (() -> Unit)? = null
+    /** Screen reader test on/off (the overlay runs the capture loop). */
+    var onScreenTest: ((Boolean) -> Unit)? = null
+    /** Shares the screen reader test log. */
+    var onShareLog: (() -> Unit)? = null
+
+    // ---- screen reader test: the last reading, shown on the mini board ----
+    var scan: Puka.State? = null; private set
+    var scanUnknown: Set<Int> = emptySet(); private set
+    var scanText = "Reading the screen…"; private set
+    private var scanHead = "Screen reader test"
+
+    /** A result from the overlay's capture loop ([j] = the helper's readScreen JSON). */
+    fun showScan(j: JSONObject) {
+        if (phase != Phase.SCREEN_TEST) return
+        if (!j.optBoolean("ok")) { scanHead = "Capture failed"; scanText = j.optString("error"); changed(); return }
+        val r = j.getJSONObject("reading")
+        val cap = j.optLong("capMs"); val conv = j.optLong("convMs"); val rd = j.optLong("readMs")
+        val timing = "grab ${cap} ms + scale ${conv} ms + read ${rd} ms"
+        if (!r.optBoolean("normal")) {
+            scanHead = "Rotate back to read the board"
+            scanText = "Not the normal view (%.2f) · %s".format(r.optDouble("score"), timing)
+            scan = null; changed(); return
+        }
+        val tall = r.getInt("tall")
+        val s = Puka.empty(if (r.optInt("myTurn") == 0) 1 else 0, tall)
+        val unk = HashSet<Int>()
+        val g = r.getJSONArray("grid")
+        for (y in 0 until g.length()) { val row = g.getJSONArray(y); for (x in 0 until row.length()) {
+            val c = row.getString(x); if (c.isEmpty()) continue
+            val i = s.idx(x, y)
+            val t = when (c.getOrNull(1)) { 'L' -> Puka.LEADER; 'W' -> Puka.WHALE; 'D' -> Puka.DOLPHIN; 'T' -> Puka.TURTLE; 'G' -> Puka.GOLD; else -> 0 }
+            if (t == 0) { unk.add(i); s.b[i] = Puka.TURTLE or (if (c[0] == 'O') 8 else 0) } else s.b[i] = t or (if (c[0] == 'O') 8 else 0)
+        } }
+        val bn = r.getJSONArray("bench")
+        for (side in 0..1) { val a = bn.getJSONArray(side); for (k in 0 until a.length()) {
+            val t = when (a.getString(k)) { "W" -> Puka.WHALE; "D" -> Puka.DOLPHIN; else -> Puka.TURTLE }; s.h[side * 5 + t]++ } }
+        scan = s; scanUnknown = unk
+        val undos = r.optInt("undos", -1); val mt = r.optInt("myTurn", -1)
+        scanHead = "Read: $tall-tall" + (if (unk.isNotEmpty()) " · ${unk.size} unsure" else "")
+        scanText = timing + " · undos " + (if (undos < 0) "?" else "$undos") + " · " + (when (mt) { 1 -> "your turn"; 0 -> "their turn"; else -> "turn ?" })
+        changed()
+    }
     var onSave: (() -> Unit)? = null
 
     // ---------------------------------------------------------------- what the panel shows
@@ -81,6 +123,7 @@ class Coach(
             Phase.MANUAL -> if (picked == null) (if (state.turn == 0) "Your move: pick a piece" else "Their move: pick a piece") else "Pick the square it moves to"
             Phase.SETTINGS -> "Panel settings"
             Phase.MOVE_PANEL -> "Move the panel with the D-pad"
+            Phase.SCREEN_TEST -> scanHead
             Phase.OVER -> when {
                 drawn -> "Draw"
                 Puka.winner(state) == 0 -> "You win!"
@@ -96,6 +139,7 @@ class Coach(
             Phase.THEIR_TURN -> if (thinking || replies.isEmpty()) "" else "Most likely first · A picks · Other… for anything else"
             Phase.MANUAL -> "A selects · B goes back"
             Phase.MOVE_PANEL -> "A or B when done"
+            Phase.SCREEN_TEST -> scanText
             Phase.OVER -> if (drawn) "Match ended in a draw" else "A wrong entry? Undo the last move puts the board back"
             else -> note
         }
@@ -107,6 +151,7 @@ class Coach(
                 Item("Normal start: they go first") { newMatch(1) },
                 Item("Stage's own setup", "set up in Fix board") { onFix?.invoke() },
                 Item("Panel settings") { goTo(Phase.SETTINGS) },
+                Item("Screen reader test") { startScreenTest() },
             )
             Phase.MY_TURN -> buildList {
                 best?.let { b -> add(Item("Yes, play it", "A") { play(b.move) }) }
@@ -122,6 +167,7 @@ class Coach(
                 add(Item("Match ended in a draw") { drawn = true; goTo(Phase.OVER) })
                 add(Item("New match") { goTo(Phase.START) })
                 add(Item("Panel settings") { goTo(Phase.SETTINGS) })
+                add(Item("Screen reader test") { startScreenTest() })
                 add(Item("Back") { goTo(back) })
             }
             Phase.SETTINGS -> listOf(
@@ -137,6 +183,13 @@ class Coach(
                 add(Item("New match: they go first") { newMatch(1) })
             }
             Phase.MANUAL, Phase.MOVE_PANEL -> emptyList()
+            Phase.SCREEN_TEST -> buildList {
+                val s = scan
+                if (s != null && scanUnknown.isEmpty() && Puka.leaderPos(s, 0) >= 0 && Puka.leaderPos(s, 1) >= 0)
+                    add(Item("Start a match from this board") { stopScreenTest(); startFrom(s) })
+                add(Item("Share test log") { onShareLog?.invoke() })
+                add(Item("Stop test") { stopScreenTest(); goTo(back) })
+            }
         }
 
     /** The move to highlight on the mini board right now, and how. */
@@ -189,6 +242,7 @@ class Coach(
             KEY_B -> when (phase) {
                 Phase.MY_TURN, Phase.THEIR_TURN -> openOther()
                 Phase.OTHER -> goTo(back)
+                Phase.SCREEN_TEST -> { stopScreenTest(); goTo(back) }
                 Phase.SETTINGS -> goTo(if (back == Phase.START) Phase.START else Phase.OTHER)
                 else -> {}
             }
@@ -272,6 +326,14 @@ class Coach(
         goTo(turnPhase())
     }
 
+    private fun startScreenTest() {
+        scan = null; scanUnknown = emptySet(); scanHead = "Screen reader test"; scanText = "Reading the screen…"
+        goTo(Phase.SCREEN_TEST)
+        onScreenTest?.invoke(true)
+    }
+
+    private fun stopScreenTest() { onScreenTest?.invoke(false) }
+
     /** A new match from a stage's own starting board (any size), set up in Fix board. */
     fun startFrom(s: Puka.State) {
         history.clear(); played.clear()
@@ -352,7 +414,7 @@ class Coach(
             .put("state", st(state))
             .put("history", JSONArray(history.map { st(it) }))
             .put("played", JSONArray(played.map { JSONArray(listOf(it.from, it.to, it.drop)) }))
-            .put("phase", (if (phase == Phase.OTHER || phase == Phase.SETTINGS || phase == Phase.MANUAL || phase == Phase.MOVE_PANEL) back else phase).name)
+            .put("phase", (if (phase == Phase.OTHER || phase == Phase.SETTINGS || phase == Phase.MANUAL || phase == Phase.MOVE_PANEL || phase == Phase.SCREEN_TEST) back else phase).name)
             .put("drawn", drawn)
     }
 

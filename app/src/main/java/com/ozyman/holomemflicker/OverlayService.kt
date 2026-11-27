@@ -63,6 +63,11 @@ class OverlayService : Service() {
     private var coachKeySeen: String? = null
     private var coach: Coach? = null
     private val coachWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    // screen reader test: grabs run on their own thread, the overlay hides itself for each grab
+    private val scanWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var scanning = false
+    private var scanHidden = false
+    private val digitsJson by lazy { try { assets.open("puka-undo-digits.json").bufferedReader().readText() } catch (_: Throwable) { "{}" } }
     private val coachPainter by lazy { CoachPainter(resources.displayMetrics.density) }
     private var fixButton: CoachFixButton? = null
     private var fixView: CoachFixView? = null
@@ -158,7 +163,7 @@ class OverlayService : Service() {
             editor?.onPoll(pressedNow)
             val co = o.optBoolean("coach")
             if (co && !coachOpen) coach().resume()
-            if (!co && coachOpen) closeFix()
+            if (!co && coachOpen) { closeFix(); scanning = false; coach?.let { if (it.phase == Coach.Phase.SCREEN_TEST) it.onKey(Coach.KEY_B) } }
             coachOpen = co
             val ck = o.optString("coachKey")
             if (coachKeySeen == null) coachKeySeen = ck
@@ -207,6 +212,8 @@ class OverlayService : Service() {
     override fun onDestroy() {
         alive = false
         coachWorker.shutdownNow()
+        scanning = false
+        scanWorker.shutdownNow()
         closeFix()
         removeFixButton()
         poller.interrupt()
@@ -274,6 +281,8 @@ class OverlayService : Service() {
     ).also { c ->
         c.onSave = { Prefs.putStr(this, "coach.state", c.toJson().toString()) }
         c.onFix = { handler.post { openFix(fresh = true) } }
+        c.onScreenTest = { on -> if (on) startScan() else scanning = false }
+        c.onShareLog = { shareScanLog() }
         c.onSettings = {
             Prefs.putStr(this, "coach.settings", c.settings.toJson().toString())
             refresh()
@@ -335,6 +344,51 @@ class OverlayService : Service() {
         lp.gravity = Gravity.CENTER
         try { wm?.addView(v, lp); fixView = v } catch (_: Throwable) {}
         refresh()
+    }
+
+    // ---- screen reader test ----
+
+    private fun setHidden(on: Boolean) {
+        scanHidden = on
+        view?.visibility = if (on) View.INVISIBLE else View.VISIBLE
+        fixButton?.visibility = if (on) View.INVISIBLE else View.VISIBLE
+    }
+
+    private fun startScan() {
+        if (scanning) return
+        scanning = true
+        try { java.io.File(filesDir, "puka-reader-log.txt").appendText("---- test started ${java.util.Date()} ----\n") } catch (_: Throwable) {}
+        scanWorker.execute {
+            while (scanning && alive) {
+                val svc = service
+                if (svc == null) { Thread.sleep(500); continue }
+                // hide the panel so it isn't in the picture, give the screen two frames to redraw
+                val hidden = java.util.concurrent.CountDownLatch(1)
+                handler.post { setHidden(true); hidden.countDown() }
+                hidden.await(); Thread.sleep(50)
+                val t0 = SystemClock.uptimeMillis()
+                val res = try { svc.readScreen(digitsJson) } catch (e: Throwable) { JSONObject().put("ok", false).put("error", e.toString()).toString() }
+                val hiddenMs = SystemClock.uptimeMillis() - t0 + 50
+                handler.post { setHidden(false) }
+                val j = try { JSONObject(res) } catch (_: Throwable) { JSONObject().put("ok", false).put("error", "bad reply") }
+                j.put("hiddenMs", hiddenMs)
+                try {
+                    val f = java.io.File(filesDir, "puka-reader-log.txt")
+                    if (f.length() > 400_000) f.writeText("")
+                    f.appendText(j.toString() + "\n")
+                } catch (_: Throwable) {}
+                handler.post { coach?.showScan(j) }
+                Thread.sleep(700)
+            }
+            handler.post { if (scanHidden) setHidden(false) }
+        }
+    }
+
+    private fun shareScanLog() {
+        val text = try { java.io.File(filesDir, "puka-reader-log.txt").readText().takeLast(90_000) } catch (_: Throwable) { "" }
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text.ifEmpty { "(empty log)" })
+            .putExtra(Intent.EXTRA_SUBJECT, "Puka screen reader log")
+        try { startActivity(Intent.createChooser(send, "Share the reader log").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Throwable) {}
     }
 
     private fun closeFix() {
