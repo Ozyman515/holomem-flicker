@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.QuickMenuTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:30" hostname="runnervm3lb7s" time="0.114">
+  <properties/>
+  <testcase name="editOpensTheEditorAndBCloses" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.021"/>
+  <testcase name="dpadMovesAndWrapsHatAndButtons" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.019"/>
+  <testcase name="rowsListModesThenExtras" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.019"/>
+  <testcase name="choosingAModeSwitchesAndCloses" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.02"/>
+  <testcase name="overlayAndLookStayOpen" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.018"/>
+  <testcase name="selectYOpensOnTheCurrentModeAndClosesAgain" classname="com.ozyman.holomemflicker.QuickMenuTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.SwipeTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:37" hostname="runnervm3lb7s" time="0.302">
+  <properties/>
+  <testcase name="slidingBeforeTheHoldCancelsThePickUp" classname="com.ozyman.holomemflicker.SwipeTest" time="0.019"/>
+  <testcase name="handleOfTheSelectedSwipeIsGrabbedAndReAims" classname="com.ozyman.holomemflicker.SwipeTest" time="0.014"/>
+  <testcase name="swipeButtonTogglesBackToATap" classname="com.ozyman.holomemflicker.SwipeTest" time="0.015"/>
+  <testcase name="speedCyclesAndWraps" classname="com.ozyman.holomemflicker.SwipeTest" time="0.01"/>
+  <testcase name="veryFastSwipeStillHasAMiddleStep" classname="com.ozyman.holomemflicker.SwipeTest" time="0.011"/>
+  <testcase name="emptySpaceNeverMovesAnything" classname="com.ozyman.holomemflicker.SwipeTest" time="0.011"/>
+  <testcase name="selectedMarkerMovesOnlyAfterTheHold" classname="com.ozyman.holomemflicker.SwipeTest" time="0.015"/>
+  <testcase name="swipeIsSavedLoadedAndSentToTheEngine" classname="com.ozyman.holomemflicker.SwipeTest" time="0.055"/>
+  <testcase name="pathEndsExactlyOnTheEndPointAtTheSwipeTime" classname="com.ozyman.holomemflicker.SwipeTest" time="0.018"/>
+  <testcase name="endButtonNeedsASwipePoint" classname="com.ozyman.holomemflicker.SwipeTest" time="0.017"/>
+  <testcase name="handleNeverTurnsTheSwipeBackIntoATap" classname="com.ozyman.holomemflicker.SwipeTest" time="0.014"/>
+  <testcase name="describeReadsTheDirection" classname="com.ozyman.holomemflicker.SwipeTest" time="0.017"/>
+  <testcase name="holdAtTheEndIsSavedAndSentToTheEngine" classname="com.ozyman.holomemflicker.SwipeTest" time="0.029"/>
+  <testcase name="firstTouchOnlySelects" classname="com.ozyman.holomemflicker.SwipeTest" time="0.029"/>
+  <testcase name="copyKeepsTheSwipe" classname="com.ozyman.holomemflicker.SwipeTest" time="0.027"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

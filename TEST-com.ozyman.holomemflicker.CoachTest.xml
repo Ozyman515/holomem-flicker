@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.CoachTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:25" hostname="runnervm3lb7s" time="2.095">
+  <properties/>
+  <testcase name="settingsSizeAndSeeThrough" classname="com.ozyman.holomemflicker.CoachTest" time="0.028"/>
+  <testcase name="fourTallBoardRulesAndCoach" classname="com.ozyman.holomemflicker.CoachTest" time="0.061"/>
+  <testcase name="unsureSquareCyclesThroughMissingPieces" classname="com.ozyman.holomemflicker.CoachTest" time="0.059"/>
+  <testcase name="selectStartOpensTheCoachAndButtonsGoToIt" classname="com.ozyman.holomemflicker.CoachTest" time="0.024"/>
+  <testcase name="loopPlaysBestThenTakesTheirPickedReply" classname="com.ozyman.holomemflicker.CoachTest" time="0.388"/>
+  <testcase name="quickMenuCanOpenTheCoach" classname="com.ozyman.holomemflicker.CoachTest" time="0.019"/>
+  <testcase name="capturesGoToTheBenchBothWays" classname="com.ozyman.holomemflicker.CoachTest" time="0.323"/>
+  <testcase name="savesAndResumesTheMatch" classname="com.ozyman.holomemflicker.CoachTest" time="0.453"/>
+  <testcase name="handEntryWithTheDpad" classname="com.ozyman.holomemflicker.CoachTest" time="0.266"/>
+  <testcase name="theyGoFirstAndBOpensOther" classname="com.ozyman.holomemflicker.CoachTest" time="0.114"/>
+  <testcase name="drawIsReversibleToo" classname="com.ozyman.holomemflicker.CoachTest" time="0.126"/>
+  <testcase name="winCanBeTakenBack" classname="com.ozyman.holomemflicker.CoachTest" time="0.214"/>
+  <testcase name="selectStartStillClosesTheEditor" classname="com.ozyman.holomemflicker.CoachTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

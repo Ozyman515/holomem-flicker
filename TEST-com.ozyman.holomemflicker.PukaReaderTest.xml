@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.PukaReaderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:28" hostname="runnervm3lb7s" time="0.973">
+  <properties/>
+  <testcase name="matchesThePrototype" classname="com.ozyman.holomemflicker.PukaReaderTest" time="0.903"/>
+  <testcase name="rotatedViewIsRejected" classname="com.ozyman.holomemflicker.PukaReaderTest" time="0.07"/>
+  <system-out><![CDATA[1444-0024.jpg 3-tall score 0.24 undo 1 myTurn true 146 ms
+1444-0080.jpg 3-tall score 0.27 undo 1 myTurn true 69 ms
+1444-0104.jpg 3-tall score 0.37 undo 1 myTurn false 64 ms
+1440-0044.jpg 3-tall score 0.20 undo 1 myTurn true 61 ms
+1440-0197.jpg 3-tall score 0.28 undo 1 myTurn false 55 ms
+1451-0041.jpg 4-tall score 0.54 undo 1 myTurn true 59 ms
+1451-0148.jpg 4-tall score 0.56 undo 0 myTurn true 67 ms
+1451-0174.jpg 4-tall score 0.66 undo 0 myTurn true 63 ms
+1453-0099.jpg 3-tall score 0.27 undo 1 myTurn true 53 ms
+1453-0060.jpg 3-tall score 0.10 undo 1 myTurn true 55 ms
+1453-0201.jpg 3-tall score 0.28 undo 1 myTurn true 62 ms
+1465-0007.jpg 4-tall score 0.59 undo 1 myTurn true 58 ms
+
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

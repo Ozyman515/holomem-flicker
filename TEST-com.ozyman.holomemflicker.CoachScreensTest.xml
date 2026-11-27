@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.CoachScreensTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:17" hostname="runnervm3lb7s" time="8.353">
+  <properties/>
+  <testcase name="fixBoard" classname="com.ozyman.holomemflicker.CoachScreensTest" time="2.461"/>
+  <testcase name="screenTest" classname="com.ozyman.holomemflicker.CoachScreensTest" time="0.694"/>
+  <testcase name="fourTall" classname="com.ozyman.holomemflicker.CoachScreensTest" time="0.848"/>
+  <testcase name="following" classname="com.ozyman.holomemflicker.CoachScreensTest" time="1.115"/>
+  <testcase name="screens" classname="com.ozyman.holomemflicker.CoachScreensTest" time="3.233"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

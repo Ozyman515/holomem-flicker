@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.ozyman.holomemflicker.PukaTrackerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-27T19:12:30" hostname="runnervm3lb7s" time="0.033">
+  <properties/>
+  <testcase name="followsTheRecordedMatches" classname="com.ozyman.holomemflicker.PukaTrackerTest" time="0.033"/>
+  <system-out><![CDATA[1444: [1M>1B, 3M>2M, 1T>2M, 3B>2B, 1B>2B, 4M>3B, 2M>3B, 4B>3B]
+1440: [2M>1M, 2T>1M, 1B>1M, 3B>4B, drop D 3M, 4B>3M, drop T 2M, 3M>4T, drop W 2B, 4T>3T, 1M>1B, 3T>2T]
+1451: [2L>1U, 2U>3T, drop T 2B, 3L>4L, UNDO, 1U>2T, 3L>4L]
+1453: [2T>1T, 1M>1T, 4B>4M, 4T>3M, 4M>3T, drop T 2T, 3T>4M, drop W 3B, 4M>3B]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
