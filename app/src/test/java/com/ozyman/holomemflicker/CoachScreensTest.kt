@@ -133,7 +133,7 @@ class CoachScreensTest {
         val c = coach(); c.startFrom(s)
         shot("coach-10-four-tall", c)
         val ctx = RuntimeEnvironment.getApplication()
-        val v = CoachFixView(ctx, s, "Stage setup") {}
+        val v = CoachFixView(ctx, s, "Stage setup", setOf(s.idx(1, 0), s.idx(2, 1))) {}
         v.measure(View.MeasureSpec.makeMeasureSpec(v.sizeW(), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(v.sizeH(), View.MeasureSpec.EXACTLY))
         v.layout(0, 0, v.sizeW(), v.sizeH())
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
