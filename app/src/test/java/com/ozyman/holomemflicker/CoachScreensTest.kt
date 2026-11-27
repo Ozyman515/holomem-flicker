@@ -142,6 +142,18 @@ class CoachScreensTest {
         cv.translate((w - v.sizeW()) / 2f, (h - v.sizeH()) / 2f)
         v.draw(cv)
         File(out, "coach-11-stage-setup-four-tall.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // a ? tapped twice: cycles through what's missing (bench turtle removed so a Turtle is missing)
+        val s2 = s.copy(); s2.h[0 * 5 + Puka.TURTLE] = 0; s2.b[s2.idx(3, 0)] = 0
+        val v2 = CoachFixView(ctx, s2, "Stage setup", setOf(s2.idx(1, 0), s2.idx(2, 1))) {}
+        v2.measure(View.MeasureSpec.makeMeasureSpec(v2.sizeW(), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(v2.sizeH(), View.MeasureSpec.EXACTLY))
+        v2.layout(0, 0, v2.sizeW(), v2.sizeH())
+        v2.tapSquare(s2.idx(1, 0)); v2.tapSquare(s2.idx(1, 0))
+        val bmp2 = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val cv2 = Canvas(bmp2)
+        backdrop(cv2)
+        cv2.translate((w - v2.sizeW()) / 2f, (h - v2.sizeH()) / 2f)
+        v2.draw(cv2)
+        File(out, "coach-11b-stage-setup-cycled.png").outputStream().use { bmp2.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     @Test

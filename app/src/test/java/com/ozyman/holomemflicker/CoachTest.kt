@@ -264,4 +264,23 @@ class CoachTest {
         assertEquals(4, d.state.w)
         assertEquals(c.state, d.state)
     }
+
+    @Test
+    fun unsureSquareCyclesThroughMissingPieces() {
+        val s = Puka.start()
+        val i = 1 // their Leader
+        s.b[i] = 0
+        // only their Leader is missing, or it's empty
+        assertEquals(listOf(Puka.LEADER or 8, 0), CoachFixView.candidates(s, i, null))
+        // a whale on the bench: still everything accounted for except the leader
+        val t = Puka.start(); val j = 0 // their Dolphin
+        t.b[j] = 0
+        assertEquals(listOf(Puka.DOLPHIN, Puka.DOLPHIN or 8, 0), CoachFixView.candidates(t, j, null))
+        t.h[0 * 5 + Puka.DOLPHIN] = 1 // it was captured: nothing can be there
+        assertEquals(listOf(0), CoachFixView.candidates(t, j, null))
+        // a missing turtle could be a Gold too; known owner -> only that side, never empty
+        val u = Puka.start(); val k = 7 // my Turtle
+        u.b[k] = 0
+        assertEquals(listOf(Puka.TURTLE, Puka.GOLD), CoachFixView.candidates(u, k, 0))
+    }
 }

@@ -76,6 +76,38 @@ class CoachFixButton(ctx: Context, private val onFire: () -> Unit) : View(ctx) {
 class CoachFixView(ctx: Context, start: Puka.State, private val title: String = "Fix board", unknown: Set<Int> = emptySet(), private val onDone: (Puka.State?) -> Unit) : View(ctx) {
     /** Squares the screen reader couldn't see: marked with ? until tapped. */
     private val unsure = unknown.toMutableSet()
+    /** Unsure squares: tapping cycles through the pieces that could be there (outlined in yellow). */
+    private val cycling = unknown.toSet()
+    /** Unsure squares where the reader saw whose piece it is (only the type was unclear). */
+    private val knownOwner = unknown.filter { start.b[it] != 0 }.associateWith { Puka.own(start.b[it]) }
+
+    companion object {
+        /**
+         * What could be on square [i], given every other square and both benches: each side has
+         * one Leader, and there are two each of Dolphin, Whale and Turtle (a Gold is a Turtle).
+         * [owner] = whose piece it is, if known (then the square isn't empty). Empty comes last.
+         */
+        fun candidates(st: Puka.State, i: Int, owner: Int?): List<Int> {
+            val t = st.copy(); t.b[i] = 0
+            val count = IntArray(6)
+            val leaders = IntArray(2)
+            for (p in t.b) if (p != 0) {
+                val ty = Puka.typ(p)
+                if (ty == Puka.LEADER) leaders[Puka.own(p)]++ else count[if (ty == Puka.GOLD) Puka.TURTLE else ty]++
+            }
+            for (side in 0..1) for (ty in Puka.DOLPHIN..Puka.TURTLE) count[ty] += t.hand(side, ty)
+            val out = ArrayList<Int>()
+            val sides = if (owner != null) listOf(owner) else listOf(0, 1)
+            for (side in sides) {
+                val bit = if (side == 1) 8 else 0
+                if (leaders[side] == 0) out.add(Puka.LEADER or bit)
+                for (ty in Puka.DOLPHIN..Puka.TURTLE) if (count[ty] < 2) out.add(ty or bit)
+                if (count[Puka.TURTLE] < 2) out.add(Puka.GOLD or bit)
+            }
+            if (owner == null) out.add(0)
+            return out
+        }
+    }
     private val d = ctx.resources.displayMetrics.density
     private val painter = CoachPainter(d)
     var s = start.copy()
@@ -96,7 +128,7 @@ class CoachFixView(ctx: Context, start: Puka.State, private val title: String = 
         fill.color = CoachPainter.PANEL
         c.drawRoundRect(0f, 0f, w, height.toFloat(), 20 * d, 20 * d, fill)
         text.textSize = 16 * d; text.color = CoachPainter.INK
-        c.drawText("$title: pick a piece, tap squares", w / 2, 28 * d, text)
+        c.drawText(if (cycling.isEmpty()) "$title: pick a piece, tap squares" else "$title: tap a ? to cycle what could be there", w / 2, 28 * d, text)
 
         val bench = 120 * d
         val bx = 24 * d + bench
@@ -110,13 +142,15 @@ class CoachFixView(ctx: Context, start: Puka.State, private val title: String = 
             c.drawRoundRect(r, 10 * d, 10 * d, fill)
             val p = s.b[i]
             if (p != 0) painter.piece(c, r.centerX(), r.centerY(), cell * 0.34f, Puka.typ(p), Puka.own(p))
-            if (i in unsure) {
-                stroke.color = CoachPainter.LEADER; stroke.strokeWidth = 3 * d
+            if (i in cycling) {
+                stroke.color = CoachPainter.LEADER; stroke.strokeWidth = (if (i in unsure) 3 else 2) * d
                 c.drawRoundRect(r, 10 * d, 10 * d, stroke)
+            }
+            if (i in unsure) {
                 text.textSize = 26 * d; text.color = CoachPainter.LEADER
                 c.drawText("?", r.centerX(), r.centerY() + 9 * d, text)
             }
-            hits.add(RectF(r) to { unsure.remove(i); s.b[i] = if (pick == 0) 0 else pick or (if (pickSide == 1) 8 else 0); invalidate() })
+            hits.add(RectF(r) to { tapSquare(i); invalidate() })
         }
         // benches with + / −
         for (side in 0..1) {
@@ -161,6 +195,16 @@ class CoachFixView(ctx: Context, start: Puka.State, private val title: String = 
         button(c, RectF(48 * d + bw * 2, y, 48 * d + bw * 3, y + 44 * d), "Cancel") { onDone(null) }
         val ok = Puka.leaderPos(s, 0) >= 0 && Puka.leaderPos(s, 1) >= 0
         button(c, RectF(60 * d + bw * 3, y, 60 * d + bw * 4, y + 44 * d), if (ok) "Done" else "Add Leaders", primary = ok) { if (ok) onDone(s.copy()) }
+    }
+
+    internal fun tapSquare(i: Int) {
+        val opts = if (i in cycling) candidates(s, i, knownOwner[i]) else emptyList()
+        if (opts.isNotEmpty()) {
+            // a ? square: step to the next piece that could be there (the first tap shows the first)
+            val at = if (i in unsure) -1 else opts.indexOf(s.b[i])
+            s.b[i] = opts[(at + 1) % opts.size]
+        } else s.b[i] = if (pick == 0) 0 else pick or (if (pickSide == 1) 8 else 0)
+        unsure.remove(i)
     }
 
     private fun button(c: Canvas, r: RectF, label: String, primary: Boolean = false, run: () -> Unit) {
